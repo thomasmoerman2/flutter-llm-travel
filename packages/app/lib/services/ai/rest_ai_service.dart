@@ -99,9 +99,7 @@ class RestAIService implements AIService {
       final response = await http
           .post(
             Uri.parse(apiUrl),
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode(requestBody),
           )
           .timeout(
@@ -167,11 +165,7 @@ class RestAIService implements AIService {
 
   @override
   Map<String, dynamic> getResponseMetadata() {
-    return {
-      'model': model,
-      'provider': 'rest',
-      ..._lastMetadata,
-    };
+    return {'model': model, 'provider': 'rest', ..._lastMetadata};
   }
 
   @override

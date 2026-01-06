@@ -5,11 +5,13 @@ import '../services/theme_color.dart';
 class BottomNavigation extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final VoidCallback? onMapActionTap;
 
   const BottomNavigation({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.onMapActionTap,
   });
 
   @override
@@ -46,6 +48,34 @@ class BottomNavigation extends StatelessWidget {
               ),
             ),
           ),
+          const Spacer(),
+          if (onMapActionTap != null)
+            SafeArea(
+              top: false,
+              child: GestureDetector(
+                onTap: onMapActionTap,
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: ThemeColor.primary,
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x26000000),
+                        blurRadius: 18,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    LucideIcons.list,
+                    size: 22,
+                    color: ThemeColor.background,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -3,20 +3,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// Helper class to access environment variables
 class EnvConfig {
   // API Configuration
-  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? 'http://localhost:5189';
-  static String get apiKey => dotenv.env['API_KEY'] ?? '';
+  static String get apiBaseUrl =>
+      dotenv.env['API_BASE_URL'] ?? 'http://localhost:5189';
 
   // WebSocket Configuration
-  static String get wsBaseUrl => dotenv.env['WS_BASE_URL'] ?? 'ws://localhost:5189';
-
-  // Authentication
-  static String get jwtSecret => dotenv.env['JWT_SECRET'] ?? '';
+  static String get wsBaseUrl =>
+      dotenv.env['WS_BASE_URL'] ?? 'ws://localhost:5189';
 
   // Third-party Services
-  static String get openAiApiKey => dotenv.env['OPENAI_API_KEY'] ?? '';
-  static String get googleMapsApiKey => dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
-  static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
-  static String get mapboxAccessToken => dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
+  static String get mapboxAccessToken =>
+      dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '';
 
   // Environment
   static String get env => dotenv.env['ENV'] ?? 'production';

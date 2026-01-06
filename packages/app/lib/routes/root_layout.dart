@@ -24,6 +24,8 @@ class _RootLayoutState extends State<RootLayout> {
   int _currentIndex = 0;
   final GlobalKey<HomePageContentState> _homePageKey =
       GlobalKey<HomePageContentState>();
+  final GlobalKey<MapPageContentState> _mapPageKey =
+      GlobalKey<MapPageContentState>();
   bool _isSidebarOpen = false;
   final FirestoreAccess _firestore = FirestoreAccess();
 
@@ -79,6 +81,10 @@ class _RootLayoutState extends State<RootLayout> {
     }
   }
 
+  void _openSavedRoutesSheet() {
+    _mapPageKey.currentState?.showSavedRoutesSheet();
+  }
+
   void _navigateToSettings() async {
     if (_isSidebarOpen) {
       _closeSidebar();
@@ -100,6 +106,68 @@ class _RootLayoutState extends State<RootLayout> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final sidebarWidth = math.min(screenWidth * 0.78, 320.0);
+    final isMapPage = _currentIndex == 1;
+    final navHeight = 60.0 + MediaQuery.of(context).padding.bottom;
+    final mapBottomInset = navHeight + 16.0;
+
+    final pageStack = IndexedStack(
+      index: _currentIndex,
+      // Key forces rebuild when locale changes
+      key: ValueKey(context.locale.toString()),
+      children: [
+        HomePageContent(key: _homePageKey),
+        MapPageContent(
+          key: _mapPageKey,
+          bottomInset: mapBottomInset,
+        ),
+      ],
+    );
+
+    final content = isMapPage
+        ? Stack(
+            children: [
+              Positioned.fill(child: pageStack),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: TopNavigationBar(
+                  onMenuTap: _openSidebar,
+                  onSettingsTap: _navigateToSettings,
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: BottomNavigation(
+                  currentIndex: _currentIndex,
+                  onTap: _handleNavigation,
+                  onMapActionTap: _openSavedRoutesSheet,
+                ),
+              ),
+            ],
+          )
+        : Column(
+            children: [
+              // Persistent Top Navigation
+              TopNavigationBar(
+                onMenuTap: _openSidebar,
+                onSettingsTap: _navigateToSettings,
+              ),
+
+              // Dynamic Content based on selected index
+              Expanded(
+                child: pageStack,
+              ),
+
+              // Persistent Bottom Navigation
+              BottomNavigation(
+                currentIndex: _currentIndex,
+                onTap: _handleNavigation,
+              ),
+            ],
+          );
 
     return Stack(
       children: [
@@ -107,34 +175,7 @@ class _RootLayoutState extends State<RootLayout> {
           ignoring: _isSidebarOpen,
           child: Container(
             color: ThemeColor.background,
-            child: Column(
-              children: [
-                // Persistent Top Navigation
-                TopNavigationBar(
-                  onMenuTap: _openSidebar,
-                  onSettingsTap: _navigateToSettings,
-                ),
-
-                // Dynamic Content based on selected index
-                Expanded(
-                  child: IndexedStack(
-                    index: _currentIndex,
-                    // Key forces rebuild when locale changes
-                    key: ValueKey(context.locale.toString()),
-                    children: [
-                      HomePageContent(key: _homePageKey),
-                      const MapPageContent(),
-                    ],
-                  ),
-                ),
-
-                // Persistent Bottom Navigation
-                BottomNavigation(
-                  currentIndex: _currentIndex,
-                  onTap: _handleNavigation,
-                ),
-              ],
-            ),
+            child: content,
           ),
         ),
         Positioned.fill(
