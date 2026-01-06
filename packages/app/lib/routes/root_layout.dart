@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/chat_message.dart';
 import '../services/firestore_access.dart';
 import '../services/theme_color.dart';
-// import '../services/mapbox_directions_service.dart';
+import '../services/mapbox_directions_service.dart';
 import '../widgets/top_navigation_bar.dart';
 import '../widgets/bottom_navigation.dart';
 import '../widgets/conversation_sidebar.dart';
@@ -29,6 +30,8 @@ class _RootLayoutState extends State<RootLayout> {
       GlobalKey<MapPageContentState>();
   bool _isSidebarOpen = false;
   final FirestoreAccess _firestore = FirestoreAccess();
+  List<LocationData> _displayedLocations = [];
+  RouteType? _displayedRouteType;
 
   void _handleNavigation(int index) {
     setState(() {
@@ -51,10 +54,13 @@ class _RootLayoutState extends State<RootLayout> {
   Future<void> _handleNewConversation() async {
     final state = _homePageKey.currentState;
     if (state != null) {
-      await state.startNewConversation();
-      setState(() {
-        _currentIndex = 0;
-      });
+      final didReset = await state.startNewConversation();
+      if (didReset) {
+        _mapPageKey.currentState?.resetMap();
+        setState(() {
+          _currentIndex = 0;
+        });
+      }
     }
     _closeSidebar();
   }
@@ -74,10 +80,13 @@ class _RootLayoutState extends State<RootLayout> {
     await _firestore.deleteConversation(conversation.id);
     final state = _homePageKey.currentState;
     if (state != null && state.currentConversationId == conversation.id) {
-      await state.startNewConversation();
-      setState(() {
-        _currentIndex = 0;
-      });
+      final didReset = await state.startNewConversation();
+      if (didReset) {
+        _mapPageKey.currentState?.resetMap();
+        setState(() {
+          _currentIndex = 0;
+        });
+      }
     }
   }
 
@@ -86,6 +95,47 @@ class _RootLayoutState extends State<RootLayout> {
   }
 
   /// Show locations on map with route
+  void _showLocationsOnMap(List<LocationData> locations, RouteType? routeType) {
+    debugPrint('🗺️ RootLayout._showLocationsOnMap called with ${locations.length} locations');
+    debugPrint('   Route type: ${routeType?.name ?? "none"}');
+
+    if (_isSidebarOpen) {
+      debugPrint('   Closing sidebar first');
+      _closeSidebar();
+    }
+
+    debugPrint('   Switching to map tab (index 1)');
+    setState(() {
+      _currentIndex = 1;
+      _displayedLocations = locations;
+      _displayedRouteType = routeType;
+    });
+
+    final mapState = _mapPageKey.currentState;
+    debugPrint('   Map state is ${mapState != null ? "available" : "NULL"}');
+
+    if (routeType != null) {
+      debugPrint('✅ Calling showRouteOnMap on map');
+      _mapPageKey.currentState?.showRouteOnMap(locations, routeType);
+    } else {
+      debugPrint('✅ Calling showLocationsOnMap on map');
+      _mapPageKey.currentState?.showLocationsOnMap(locations);
+    }
+  }
+
+  void _showLocationsListSheet() {
+    _mapPageKey.currentState?.showLocationsListSheet(
+      _displayedLocations,
+      _displayedRouteType,
+      onRouteUpdated: (newLocations, newRouteType) {
+        // Update the displayed route when user reorders and shows route
+        setState(() {
+          _displayedLocations = newLocations;
+          _displayedRouteType = newRouteType;
+        });
+      },
+    );
+  }
 
   void _navigateToSettings() async {
     if (_isSidebarOpen) {
@@ -117,7 +167,10 @@ class _RootLayoutState extends State<RootLayout> {
       // Key forces rebuild when locale changes
       key: ValueKey(context.locale.toString()),
       children: [
-        HomePageContent(key: _homePageKey),
+        HomePageContent(
+          key: _homePageKey,
+          onShowOnMap: _showLocationsOnMap,
+        ),
         MapPageContent(key: _mapPageKey, bottomInset: mapBottomInset),
       ],
     );
@@ -143,6 +196,8 @@ class _RootLayoutState extends State<RootLayout> {
                   currentIndex: _currentIndex,
                   onTap: _handleNavigation,
                   onMapActionTap: _openSavedRoutesSheet,
+                  onLocationsListTap: _displayedLocations.isNotEmpty ? _showLocationsListSheet : null,
+                  showLocationsButton: _displayedLocations.isNotEmpty,
                 ),
               ),
             ],
@@ -162,6 +217,8 @@ class _RootLayoutState extends State<RootLayout> {
               BottomNavigation(
                 currentIndex: _currentIndex,
                 onTap: _handleNavigation,
+                onLocationsListTap: _displayedLocations.isNotEmpty ? _showLocationsListSheet : null,
+                showLocationsButton: _displayedLocations.isNotEmpty,
               ),
             ],
           );

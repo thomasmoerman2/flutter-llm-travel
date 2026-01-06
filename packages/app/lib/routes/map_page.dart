@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../services/env_config.dart';
+import '../services/mapbox_directions_service.dart';
 import '../services/theme_color.dart';
 import '../services/mapbox_search_service.dart';
 
@@ -22,19 +27,20 @@ class MapPageContent extends StatefulWidget {
 class MapPageContentState extends State<MapPageContent> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final List<_SavedRoute> _savedRoutes = [
-    _SavedRoute(title: 'Trip to Portugal', routeCount: 6),
-    _SavedRoute(title: 'Roadtrip through the Valley', routeCount: 4),
-    _SavedRoute(title: 'Best stops in Rome', routeCount: 8),
-    _SavedRoute(title: 'Weekend in Paris', routeCount: 3),
-  ];
 
   late final CameraOptions _cameraOptions;
   late final Widget _mapWidget;
   bool _hasToken = true;
   MapboxMap? _mapboxMap;
   PointAnnotationManager? _pointAnnotationManager;
+  CircleAnnotationManager? _circleAnnotationManager;
+  PointAnnotationManager? _labelAnnotationManager;
   PolylineAnnotationManager? _polylineAnnotationManager;
+  List<LocationData>? _pendingLocations;
+  RouteType? _pendingRouteType;
+  bool _pendingIsRoute = false;
+  bool _pendingReset = false;
+  List<LocationData> _currentLocations = [];
 
   // Search state
   List<SearchResult> _searchResults = [];
@@ -84,13 +90,24 @@ class MapPageContentState extends State<MapPageContent> {
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
 
-    // Create point annotation manager for markers
+    // Create point annotation manager for markers (search results)
     _pointAnnotationManager = await mapboxMap.annotations
+        .createPointAnnotationManager();
+
+    // Create circle annotation manager for location markers (from AI)
+    _circleAnnotationManager = await mapboxMap.annotations
+        .createCircleAnnotationManager();
+
+    // Create label annotation manager for location names
+    _labelAnnotationManager = await mapboxMap.annotations
         .createPointAnnotationManager();
 
     // Create polyline annotation manager for routes
     _polylineAnnotationManager = await mapboxMap.annotations
         .createPolylineAnnotationManager();
+
+    debugPrint('✅ Map annotation managers created');
+    _applyPendingMapUpdate();
   }
 
   /// Perform search
@@ -210,6 +227,36 @@ class MapPageContentState extends State<MapPageContent> {
     }
   }
 
+  bool get _isMapReady =>
+      _mapboxMap != null &&
+      _pointAnnotationManager != null &&
+      _circleAnnotationManager != null &&
+      _labelAnnotationManager != null &&
+      _polylineAnnotationManager != null;
+
+  void _applyPendingMapUpdate() {
+    if (_pendingReset) {
+      _pendingReset = false;
+      resetMap();
+      return;
+    }
+
+    final locations = _pendingLocations;
+    if (locations == null) return;
+
+    final routeType = _pendingRouteType;
+    final isRoute = _pendingIsRoute;
+    _pendingLocations = null;
+    _pendingRouteType = null;
+    _pendingIsRoute = false;
+
+    if (isRoute && routeType != null) {
+      showRouteOnMap(locations, routeType);
+    } else {
+      showLocationsOnMap(locations);
+    }
+  }
+
   void _clearSearch() {
     _searchController.clear();
     setState(() {
@@ -316,6 +363,288 @@ class MapPageContentState extends State<MapPageContent> {
     }).toList();
 
     await _pointAnnotationManager!.createMulti(annotations);
+  }
+
+  Future<void> _clearMapOverlays() async {
+    debugPrint('🧹 Clearing all map overlays...');
+    await _pointAnnotationManager?.deleteAll();
+    await _circleAnnotationManager?.deleteAll();
+    await _labelAnnotationManager?.deleteAll();
+    await _polylineAnnotationManager?.deleteAll();
+    debugPrint('✅ Map overlays cleared');
+  }
+
+  Future<void> _showLocationMarkers(List<LocationData> locations) async {
+    if (_circleAnnotationManager == null || _labelAnnotationManager == null) {
+      debugPrint('❌ Circle or label annotation manager is null');
+      return;
+    }
+
+    // Store current locations for tap handling
+    _currentLocations = locations;
+
+    debugPrint('📍 Creating ${locations.length} circle markers with labels');
+    final circleAnnotations = <CircleAnnotationOptions>[];
+    final labelAnnotations = <PointAnnotationOptions>[];
+
+    for (var i = 0; i < locations.length; i++) {
+      final location = locations[i];
+      debugPrint(
+        '   Creating marker $i: ${location.name} at (${location.latitude}, ${location.longitude})',
+      );
+
+      // Create circle marker with custom data for tap handling
+      circleAnnotations.add(
+        CircleAnnotationOptions(
+          geometry: Point(
+            coordinates: Position(location.longitude, location.latitude),
+          ),
+          circleRadius: 12.0, // Bigger radius
+          circleColor: ThemeColor.primary.value,
+          circleStrokeColor: 0xFFFFFFFF,
+          circleStrokeWidth: 3.0, // Thicker stroke
+        ),
+      );
+
+      // Create text label
+      labelAnnotations.add(
+        PointAnnotationOptions(
+          geometry: Point(
+            coordinates: Position(location.longitude, location.latitude),
+          ),
+          textField: location.name,
+          textSize: 12.0,
+          textColor: 0xFF000000, // Black text
+          textHaloColor: 0xFFFFFFFF, // White halo for readability
+          textHaloWidth: 2.0,
+          textOffset: [0.0, -2.0], // Offset above the marker
+          textAnchor: TextAnchor.BOTTOM,
+        ),
+      );
+    }
+
+    final createdCircles = await _circleAnnotationManager!.createMulti(
+      circleAnnotations,
+    );
+    final createdLabels = await _labelAnnotationManager!.createMulti(
+      labelAnnotations,
+    );
+
+    // Add tap listener for circles
+    _circleAnnotationManager!.addOnCircleAnnotationClickListener(
+      _CircleAnnotationClickListener(
+        onTap: (annotation) {
+          // Find which location was tapped based on coordinates
+          final tappedCoords = annotation.geometry.coordinates;
+          for (final location in _currentLocations) {
+            // Check if coordinates match (with small tolerance for floating point)
+            if ((location.longitude - tappedCoords.lng).abs() < 0.0001 &&
+                (location.latitude - tappedCoords.lat).abs() < 0.0001) {
+              debugPrint('📍 Marker tapped: ${location.name}');
+              _showLocationDetails(location);
+              break;
+            }
+          }
+        },
+      ),
+    );
+
+    debugPrint(
+      '✅ Successfully created ${createdCircles.length} markers and ${createdLabels.length} labels on map',
+    );
+  }
+
+  void _showLocationDetails(LocationData location) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.4,
+          decoration: const BoxDecoration(
+            color: ThemeColor.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: ThemeColor.textSecondary.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Location name
+                  Text(
+                    location.name,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: ThemeColor.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Description if available
+                  if (location.description != null &&
+                      location.description!.isNotEmpty) ...[
+                    Text(
+                      location.description!,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: ThemeColor.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Coordinates
+                  Row(
+                    children: [
+                      const Icon(
+                        LucideIcons.mapPin,
+                        size: 16,
+                        color: ThemeColor.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: ThemeColor.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const Spacer(),
+
+                  // Close button
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: ThemeColor.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Close',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: ThemeColor.background,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _drawRoute(RouteInfo route) async {
+    if (_polylineAnnotationManager == null) return;
+
+    final positions = route.geometry
+        .map((coord) => Position(coord[0], coord[1]))
+        .toList();
+
+    final line = PolylineAnnotationOptions(
+      geometry: LineString(coordinates: positions),
+      lineColor: ThemeColor.primary.value,
+      lineWidth: 4.0,
+    );
+
+    await _polylineAnnotationManager!.create(line);
+  }
+
+  Future<void> _fitCameraToLocations(List<LocationData> locations) async {
+    if (_mapboxMap == null || locations.isEmpty) {
+      debugPrint(
+        '❌ Cannot fit camera: map=${_mapboxMap != null}, locations=${locations.length}',
+      );
+      return;
+    }
+
+    debugPrint('📷 Fitting camera to ${locations.length} location(s)');
+    for (var i = 0; i < locations.length; i++) {
+      debugPrint(
+        '   [$i] ${locations[i].name}: ${locations[i].latitude}, ${locations[i].longitude}',
+      );
+    }
+
+    if (locations.length == 1) {
+      final location = locations.first;
+      debugPrint('📍 Single location - zooming to level 12');
+      await _mapboxMap!.flyTo(
+        CameraOptions(
+          center: Point(
+            coordinates: Position(location.longitude, location.latitude),
+          ),
+          zoom: 12,
+          pitch: 0,
+          bearing: 0,
+        ),
+        MapAnimationOptions(duration: 1000, startDelay: 0),
+      );
+      debugPrint('✅ Camera moved to single location');
+      return;
+    }
+
+    double minLng = locations.first.longitude;
+    double maxLng = locations.first.longitude;
+    double minLat = locations.first.latitude;
+    double maxLat = locations.first.latitude;
+
+    for (final location in locations) {
+      if (location.longitude < minLng) minLng = location.longitude;
+      if (location.longitude > maxLng) maxLng = location.longitude;
+      if (location.latitude < minLat) minLat = location.latitude;
+      if (location.latitude > maxLat) maxLat = location.latitude;
+    }
+
+    debugPrint('📐 Bounds: Lng[$minLng, $maxLng], Lat[$minLat, $maxLat]');
+
+    final padding = 0.1;
+    final lngPadding = (maxLng - minLng) * padding;
+    final latPadding = (maxLat - minLat) * padding;
+
+    final centerLng = (minLng + maxLng) / 2;
+    final centerLat = (minLat + maxLat) / 2;
+    final zoomLevel = _calculateZoomLevel(
+      maxLng - minLng + lngPadding * 2,
+      maxLat - minLat + latPadding * 2,
+    );
+
+    debugPrint('📷 Camera center: ($centerLat, $centerLng), zoom: $zoomLevel');
+
+    await _mapboxMap!.flyTo(
+      CameraOptions(
+        center: Point(coordinates: Position(centerLng, centerLat)),
+        zoom: zoomLevel,
+        pitch: 0,
+        bearing: 0,
+      ),
+      MapAnimationOptions(duration: 1500, startDelay: 0),
+    );
+    debugPrint('✅ Camera fitted to all locations');
   }
 
   /// Fit camera to show all search results
@@ -710,140 +1039,427 @@ class MapPageContentState extends State<MapPageContent> {
     _showSavedRoutesSheet();
   }
 
-  void _showSavedRoutesSheet() {
+  void showLocationsListSheet(
+    List<LocationData> locations,
+    RouteType? routeType, {
+    Function(List<LocationData>, RouteType?)? onRouteUpdated,
+  }) {
+    _showLocationsListSheet(
+      locations,
+      routeType,
+      onRouteUpdated: onRouteUpdated,
+    );
+  }
+
+  Future<void> resetMap() async {
+    _pendingLocations = null;
+    _pendingRouteType = null;
+    _pendingIsRoute = false;
+    _pendingReset = false;
+    _currentLocations = [];
+
+    if (!_isMapReady) {
+      _pendingReset = true;
+      return;
+    }
+
+    if (!mounted) return;
+
+    _searchController.clear();
+    setState(() {
+      _searchResults = [];
+      _filteredSuggestions = [];
+      _showResults = false;
+      _showSuggestions = false;
+      _hasQuery = false;
+    });
+
+    await _clearMapOverlays();
+
+    await _mapboxMap!.flyTo(
+      CameraOptions(
+        center: Point(coordinates: Position(0, 0)),
+        zoom: 1,
+        pitch: 0,
+        bearing: 0,
+      ),
+      MapAnimationOptions(duration: 800, startDelay: 0),
+    );
+  }
+
+  Future<void> showLocationsOnMap(List<LocationData> locations) async {
+    debugPrint(
+      '🗺️ MapPage.showLocationsOnMap called with ${locations.length} locations',
+    );
+    debugPrint('   Map ready: $_isMapReady');
+
+    if (!_isMapReady) {
+      debugPrint('⏳ Map not ready, saving as pending');
+      _pendingReset = false;
+      _pendingLocations = locations;
+      _pendingRouteType = null;
+      _pendingIsRoute = false;
+      return;
+    }
+
+    if (!mounted) {
+      debugPrint('❌ Widget not mounted');
+      return;
+    }
+    if (locations.isEmpty) {
+      debugPrint('❌ No locations to show');
+      return;
+    }
+
+    debugPrint('🧹 Clearing search UI');
+    setState(() {
+      _showResults = false;
+      _showSuggestions = false;
+    });
+
+    debugPrint('🧹 Clearing existing map overlays');
+    await _clearMapOverlays();
+    debugPrint('📍 Adding ${locations.length} location markers');
+    await _showLocationMarkers(locations);
+
+    // Small delay to ensure markers are rendered before zooming
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    debugPrint('📷 Fitting camera to locations');
+    await _fitCameraToLocations(locations);
+    debugPrint('✅ Locations displayed on map');
+  }
+
+  Future<void> showRouteOnMap(
+    List<LocationData> locations,
+    RouteType routeType,
+  ) async {
+    debugPrint(
+      '🗺️ MapPage.showRouteOnMap called with ${locations.length} locations',
+    );
+    debugPrint('   Route type: ${routeType.name}');
+    debugPrint('   Map ready: $_isMapReady');
+
+    if (!_isMapReady) {
+      debugPrint('⏳ Map not ready, saving as pending');
+      _pendingReset = false;
+      _pendingLocations = locations;
+      _pendingRouteType = routeType;
+      _pendingIsRoute = true;
+      return;
+    }
+
+    if (!mounted) {
+      debugPrint('❌ Widget not mounted');
+      return;
+    }
+    if (locations.isEmpty) {
+      debugPrint('❌ No locations to show');
+      return;
+    }
+
+    debugPrint('🧹 Clearing search UI');
+    setState(() {
+      _showResults = false;
+      _showSuggestions = false;
+    });
+
+    if (locations.length < 2) {
+      debugPrint('ℹ️ Only 1 location, showing as marker instead of route');
+      await showLocationsOnMap(locations);
+      return;
+    }
+
+    debugPrint('🧹 Clearing existing map overlays');
+    await _clearMapOverlays();
+    debugPrint('📍 Adding ${locations.length} location markers');
+    await _showLocationMarkers(locations);
+
+    try {
+      debugPrint('🛣️ Calculating route with Mapbox...');
+      final route = await MapboxDirectionsService.calculateRoute(
+        waypoints: locations,
+        routeType: routeType,
+      );
+      debugPrint('✅ Route calculated successfully');
+      debugPrint('📏 Drawing route on map');
+      await _drawRoute(route);
+
+      // Small delay to ensure route is rendered before zooming
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      debugPrint('📷 Fitting camera to locations');
+      await _fitCameraToLocations(locations);
+      debugPrint('✅ Route displayed on map');
+    } catch (e) {
+      debugPrint('❌ Route calculation failed: $e');
+
+      // Small delay before zooming
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      debugPrint('📷 Fitting camera to locations (without route)');
+      await _fitCameraToLocations(locations);
+    }
+  }
+
+  void _showLocationsListSheet(
+    List<LocationData> locations,
+    RouteType? routeType, {
+    Function(List<LocationData>, RouteType?)? onRouteUpdated,
+  }) {
     showCupertinoModalPopup(
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, modalSetState) {
-            final height = MediaQuery.of(context).size.height * 0.62;
-            return Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                height: height,
-                decoration: const BoxDecoration(
-                  color: ThemeColor.background,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x1A000000),
-                      blurRadius: 24,
-                      offset: Offset(0, -8),
-                    ),
-                  ],
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            _SheetIconButton(
-                              icon: LucideIcons.x,
-                              onTap: () => Navigator.pop(context),
+          builder: (context, setModalState) {
+            // Make a mutable copy for reordering
+            final reorderableLocations = List<LocationData>.from(locations);
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.7,
+              decoration: const BoxDecoration(
+                color: ThemeColor.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: ThemeColor.textSecondary.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Title with hint
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Locations (${reorderableLocations.length})',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: ThemeColor.textPrimary,
                             ),
-                            Expanded(
-                              child: Center(
-                                child: Text(
-                                  'map.saved_routes'.tr(),
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: ThemeColor.textPrimary,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Long press and drag to reorder',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: ThemeColor.textSecondary.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Reorderable Locations list
+                      Expanded(
+                        child: ReorderableListView.builder(
+                          itemCount: reorderableLocations.length,
+                          onReorder: (oldIndex, newIndex) {
+                            setModalState(() {
+                              if (newIndex > oldIndex) {
+                                newIndex -= 1;
+                              }
+                              final item = reorderableLocations.removeAt(
+                                oldIndex,
+                              );
+                              reorderableLocations.insert(newIndex, item);
+                            });
+                            debugPrint('🔄 Reordered: $oldIndex -> $newIndex');
+                          },
+                          itemBuilder: (context, index) {
+                            final location = reorderableLocations[index];
+                            return Container(
+                              key: ValueKey(location.name + index.toString()),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: ThemeColor.surface,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: ThemeColor.primary.withOpacity(
+                                        0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: ThemeColor.primary,
+                                        ),
+                                      ),
+                                    ),
                                   ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          location.name,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: ThemeColor.textPrimary,
+                                          ),
+                                        ),
+                                        if (location.description != null &&
+                                            location
+                                                .description!
+                                                .isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            location.description!,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: ThemeColor.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(
+                                    LucideIcons.gripVertical,
+                                    size: 20,
+                                    color: ThemeColor.textSecondary,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Action buttons
+                      if (reorderableLocations.length >= 2)
+                        Column(
+                          children: [
+                            // Update Route button (show updated route)
+                            GestureDetector(
+                              onTap: () async {
+                                Navigator.pop(context);
+                                // Notify parent about route update
+                                onRouteUpdated?.call(
+                                  reorderableLocations,
+                                  RouteType.driving,
+                                );
+                                // Show the route on map
+                                await showRouteOnMap(
+                                  reorderableLocations,
+                                  RouteType.driving,
+                                );
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: ThemeColor.primary,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      routeType != null
+                                          ? LucideIcons.refreshCw
+                                          : LucideIcons.route,
+                                      size: 20,
+                                      color: ThemeColor.background,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      routeType != null
+                                          ? 'Update Route'
+                                          : 'Show Route',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: ThemeColor.background,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            _SheetIconButton(
-                              icon: LucideIcons.plus,
-                              filled: true,
-                              onTap: () {},
+                            const SizedBox(height: 12),
+                            // Save Route button
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.pop(context);
+                                _saveRouteDialog(
+                                  reorderableLocations,
+                                  routeType,
+                                );
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: ThemeColor.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: ThemeColor.primary,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(
+                                      LucideIcons.save,
+                                      size: 20,
+                                      color: ThemeColor.primary,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Save Route',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: ThemeColor.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: _savedRoutes.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    'map.no_saved_routes'.tr(),
-                                    style: TextStyle(
-                                      color: ThemeColor.textSecondary,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                )
-                              : ListView.separated(
-                                  itemCount: _savedRoutes.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 10),
-                                  itemBuilder: (context, index) {
-                                    final route = _savedRoutes[index];
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: ThemeColor.surface,
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  route.title,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w600,
-                                                    color:
-                                                        ThemeColor.textPrimary,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  '${route.routeCount} routes',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: ThemeColor
-                                                        .textSecondary,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          _SheetIconButton(
-                                            icon: LucideIcons.trash2,
-                                            onTap: () {
-                                              setState(() {
-                                                _savedRoutes.removeAt(index);
-                                              });
-                                              modalSetState(() {});
-                                            },
-                                          ),
-                                          const SizedBox(width: 8),
-                                          _SheetIconButton(
-                                            icon: LucideIcons.share2,
-                                            onTap: () {},
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -853,13 +1469,444 @@ class MapPageContentState extends State<MapPageContent> {
       },
     );
   }
-}
 
-class _SavedRoute {
-  final String title;
-  final int routeCount;
+  Future<void> _createOptimizedRoute(List<LocationData> locations) async {
+    debugPrint(
+      '🛣️ Creating optimized route for ${locations.length} locations',
+    );
 
-  const _SavedRoute({required this.title, required this.routeCount});
+    // TODO: Call Mapbox Optimization API to get the best route order
+    // For now, we'll use the locations as-is and show with driving route
+    await showRouteOnMap(locations, RouteType.driving);
+  }
+
+  void _saveRouteDialog(List<LocationData> locations, RouteType? routeType) {
+    final TextEditingController nameController = TextEditingController();
+
+    showCupertinoDialog(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: const Text('Save Route'),
+          content: Column(
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                routeType != null
+                    ? 'Save this ${routeType.name} route with ${locations.length} stops:'
+                    : 'Give your route a name:',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              CupertinoTextField(
+                controller: nameController,
+                placeholder: 'e.g., Amsterdam Tour',
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+              ),
+            ],
+          ),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('Cancel'),
+              onPressed: () {
+                nameController.dispose();
+                Navigator.pop(context);
+              },
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () async {
+                final routeName = nameController.text.trim();
+                if (routeName.isEmpty) {
+                  // Show error
+                  return;
+                }
+
+                Navigator.pop(context);
+                await _saveRoute(routeName, locations, routeType);
+                nameController.dispose();
+
+                if (!mounted) return;
+                // Show success message
+                showCupertinoDialog(
+                  context: context,
+                  builder: (context) => CupertinoAlertDialog(
+                    title: const Text('Success'),
+                    content: Text('Route "$routeName" saved!'),
+                    actions: [
+                      CupertinoDialogAction(
+                        child: const Text('OK'),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveRoute(
+    String name,
+    List<LocationData> locations,
+    RouteType? routeType,
+  ) async {
+    debugPrint('💾 Saving route: $name with ${locations.length} locations');
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('❌ User not logged in, cannot save route');
+        return;
+      }
+
+      final routeData = {
+        'userId': user.uid,
+        'name': name,
+        'locationCount': locations.length,
+        'locations': locations.map((loc) => loc.toJson()).toList(),
+        'routeType': routeType?.name,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirebaseFirestore.instance.collection('savedRoutes').add(routeData);
+
+      debugPrint('✅ Route saved successfully');
+    } catch (e) {
+      debugPrint('❌ Error saving route: $e');
+      if (!mounted) return;
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: Text('Failed to save route: ${e.toString()}'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void _showSavedRoutesSheet() {
+    final user = FirebaseAuth.instance.currentUser;
+
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) {
+        final height = MediaQuery.of(context).size.height * 0.62;
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            height: height,
+            decoration: const BoxDecoration(
+              color: ThemeColor.background,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x1A000000),
+                  blurRadius: 24,
+                  offset: Offset(0, -8),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        _SheetIconButton(
+                          icon: LucideIcons.x,
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              'map.saved_routes'.tr(),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: ThemeColor.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 36), // Placeholder for symmetry
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: user == null
+                          ? Center(
+                              child: Text(
+                                'Please log in to view saved routes',
+                                style: TextStyle(
+                                  color: ThemeColor.textSecondary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            )
+                          : StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('savedRoutes')
+                                  .where('userId', isEqualTo: user.uid)
+                                  .orderBy('createdAt', descending: true)
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                    child: CupertinoActivityIndicator(),
+                                  );
+                                }
+
+                                if (snapshot.hasError) {
+                                  return Center(
+                                    child: Text(
+                                      'Error loading routes',
+                                      style: TextStyle(
+                                        color: ThemeColor.textSecondary,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final routes = snapshot.data?.docs ?? [];
+
+                                if (routes.isEmpty) {
+                                  return Center(
+                                    child: Text(
+                                      'map.no_saved_routes'.tr(),
+                                      style: TextStyle(
+                                        color: ThemeColor.textSecondary,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                return ListView.separated(
+                                  itemCount: routes.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    final routeDoc = routes[index];
+                                    final routeData =
+                                        routeDoc.data() as Map<String, dynamic>;
+                                    final routeName =
+                                        routeData['name'] as String;
+                                    final locationCount =
+                                        routeData['locationCount'] as int;
+                                    final routeType =
+                                        routeData['routeType'] as String?;
+
+                                    return GestureDetector(
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _loadSavedRoute(routeDoc.id, routeData);
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: ThemeColor.surface,
+                                          borderRadius: BorderRadius.circular(
+                                            18,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    routeName,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: ThemeColor
+                                                          .textPrimary,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        routeType == 'walking'
+                                                            ? LucideIcons
+                                                                  .footprints
+                                                            : routeType ==
+                                                                  'cycling'
+                                                            ? LucideIcons.bike
+                                                            : LucideIcons.car,
+                                                        size: 12,
+                                                        color: ThemeColor
+                                                            .textSecondary,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '$locationCount stops',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color: ThemeColor
+                                                              .textSecondary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            _SheetIconButton(
+                                              icon: LucideIcons.trash2,
+                                              onTap: () async {
+                                                await _deleteSavedRoute(
+                                                  routeDoc.id,
+                                                  routeName,
+                                                );
+                                              },
+                                            ),
+                                            const SizedBox(width: 8),
+                                            const Icon(
+                                              LucideIcons.chevronRight,
+                                              size: 18,
+                                              color: ThemeColor.textSecondary,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _loadSavedRoute(
+    String routeId,
+    Map<String, dynamic> routeData,
+  ) async {
+    debugPrint('📍 Loading saved route: ${routeData['name']}');
+
+    try {
+      final locationsData = routeData['locations'] as List<dynamic>;
+      final locations = locationsData
+          .map((loc) => LocationData.fromJson(loc as Map<String, dynamic>))
+          .toList();
+
+      final routeTypeName = routeData['routeType'] as String?;
+      RouteType? routeType;
+      if (routeTypeName != null) {
+        routeType = RouteType.values.firstWhere(
+          (e) => e.name == routeTypeName,
+          orElse: () => RouteType.driving,
+        );
+      }
+
+      if (routeType != null) {
+        await showRouteOnMap(locations, routeType);
+      } else {
+        await showLocationsOnMap(locations);
+      }
+
+      debugPrint('✅ Route loaded successfully');
+    } catch (e) {
+      debugPrint('❌ Error loading route: $e');
+      if (!mounted) return;
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: Text('Failed to load route: ${e.toString()}'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteSavedRoute(String routeId, String routeName) async {
+    final confirm = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Delete Route'),
+        content: Text('Are you sure you want to delete "$routeName"?'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('savedRoutes')
+          .doc(routeId)
+          .delete();
+
+      debugPrint('✅ Route deleted successfully');
+    } catch (e) {
+      debugPrint('❌ Error deleting route: $e');
+      if (!mounted) return;
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: Text('Failed to delete route: ${e.toString()}'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+    }
+  }
 }
 
 class _SheetIconButton extends StatelessWidget {
@@ -891,5 +1938,17 @@ class _SheetIconButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Custom implementation of OnCircleAnnotationClickListener
+class _CircleAnnotationClickListener extends OnCircleAnnotationClickListener {
+  final void Function(CircleAnnotation) onTap;
+
+  _CircleAnnotationClickListener({required this.onTap});
+
+  @override
+  void onCircleAnnotationClick(CircleAnnotation annotation) {
+    onTap(annotation);
   }
 }

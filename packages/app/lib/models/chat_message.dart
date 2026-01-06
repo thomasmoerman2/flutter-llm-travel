@@ -102,7 +102,15 @@ class ChatMessage {
     return locations != null && locations is List && locations.isNotEmpty;
   }
 
-  /// Add locations to message
+  bool get hasRoute {
+    if (metadata == null) return false;
+    final routeType = metadata!['routeType'];
+    if (routeType is String && routeType.isNotEmpty) {
+      return true;
+    }
+    final route = metadata!['route'];
+    return route != null;
+  }
 }
 
 class Conversation {

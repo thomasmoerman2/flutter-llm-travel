@@ -9,15 +9,17 @@ import '../services/chat_service.dart';
 import '../services/firestore_access.dart';
 import '../services/preferences_service.dart';
 import '../services/theme_color.dart';
-// import '../services/mapbox_directions_service.dart';
+import '../services/mapbox_directions_service.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// Content-only widget for the home page (without navigation)
 /// Used inside RootLayout
 class HomePageContent extends StatefulWidget {
   final String? initialModel;
+  final void Function(List<LocationData> locations, RouteType? routeType)?
+      onShowOnMap;
 
-  const HomePageContent({super.key, this.initialModel});
+  const HomePageContent({super.key, this.initialModel, this.onShowOnMap});
 
   @override
   State<HomePageContent> createState() => HomePageContentState();
@@ -202,21 +204,22 @@ class HomePageContentState extends State<HomePageContent>
         );
   }
 
-  Future<void> startNewConversation() async {
+  Future<bool> startNewConversation() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _promptLoginRequired();
-      return;
+      return false;
     }
 
     await _chatService.resetConversation();
     _messagesSubscription?.cancel();
-    if (!mounted) return;
+    if (!mounted) return false;
 
     setState(() {
       _conversationId = null;
       _messages = [];
     });
+    return true;
   }
 
   Future<void> openConversation(Conversation conversation) async {
@@ -323,6 +326,15 @@ class HomePageContentState extends State<HomePageContent>
     }
   }
 
+  Future<void> _resendMessage(String text) async {
+    if (_isSending) return;
+    _textController.text = text;
+    _textController.selection = TextSelection.fromPosition(
+      TextPosition(offset: text.length),
+    );
+    await _handleSend();
+  }
+
   void _showError(String message) {
     showCupertinoDialog(
       context: context,
@@ -337,6 +349,60 @@ class HomePageContentState extends State<HomePageContent>
         ],
       ),
     );
+  }
+
+  void _handleShowOnMap(ChatMessage message) {
+    debugPrint('🗺️ _handleShowOnMap called');
+    final callback = widget.onShowOnMap;
+    if (callback == null) {
+      debugPrint('❌ No onShowOnMap callback provided');
+      return;
+    }
+
+    final locations = _extractLocations(message);
+    debugPrint('📍 Extracted ${locations.length} locations from message');
+    if (locations.isEmpty) {
+      debugPrint('❌ No locations found in message metadata');
+      _showError('No locations found for this response.');
+      return;
+    }
+
+    for (var i = 0; i < locations.length; i++) {
+      debugPrint('   Location $i: ${locations[i].name} (${locations[i].latitude}, ${locations[i].longitude})');
+    }
+
+    final routeType = _extractRouteType(message);
+    debugPrint('🛣️ Route type: ${routeType?.name ?? "none"}');
+    debugPrint('✅ Calling onShowOnMap callback');
+    callback(locations, routeType);
+  }
+
+  List<LocationData> _extractLocations(ChatMessage message) {
+    final locationsData = message.metadata?['locations'];
+    if (locationsData is! List) return [];
+
+    final locations = <LocationData>[];
+    for (final entry in locationsData) {
+      if (entry is Map<String, dynamic>) {
+        try {
+          locations.add(LocationData.fromJson(entry));
+        } catch (_) {}
+      }
+    }
+    return locations;
+  }
+
+  RouteType? _extractRouteType(ChatMessage message) {
+    final routeTypeValue = message.metadata?['routeType'];
+    if (routeTypeValue is String) {
+      final normalized = routeTypeValue.toLowerCase();
+      if (normalized.contains('walk')) return RouteType.walking;
+      if (normalized.contains('cycl') || normalized.contains('bike')) {
+        return RouteType.cycling;
+      }
+      if (normalized.contains('drive')) return RouteType.driving;
+    }
+    return null;
   }
 
   void _showSuccess(String message) {
@@ -393,6 +459,13 @@ class HomePageContentState extends State<HomePageContent>
                         showModel:
                             index == 0 ||
                             message.model != _messages[index - 1].model,
+                        onShowOnMap: (!message.isUser &&
+                                (message.hasLocations || message.hasRoute))
+                            ? () => _handleShowOnMap(message)
+                            : null,
+                        onResend: message.isUser
+                            ? (text) => _resendMessage(text)
+                            : null,
                       );
                     },
                   ),

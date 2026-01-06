@@ -6,12 +6,16 @@ class BottomNavigation extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
   final VoidCallback? onMapActionTap;
+  final VoidCallback? onLocationsListTap;
+  final bool showLocationsButton;
 
   const BottomNavigation({
     super.key,
     required this.currentIndex,
     required this.onTap,
     this.onMapActionTap,
+    this.onLocationsListTap,
+    this.showLocationsButton = false,
   });
 
   @override
@@ -49,6 +53,38 @@ class BottomNavigation extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          if (showLocationsButton &&
+              onLocationsListTap != null &&
+              onMapActionTap != null)
+            SafeArea(
+              top: false,
+              child: GestureDetector(
+                onTap: onLocationsListTap,
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  margin: EdgeInsets.only(
+                    right: onMapActionTap != null ? 12 : 0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ThemeColor.primary,
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x26000000),
+                        blurRadius: 18,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    LucideIcons.mapPinned,
+                    size: 22,
+                    color: ThemeColor.background,
+                  ),
+                ),
+              ),
+            ),
           if (onMapActionTap != null)
             SafeArea(
               top: false,

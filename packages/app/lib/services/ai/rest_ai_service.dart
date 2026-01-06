@@ -82,39 +82,44 @@ class RestAIService implements AIService {
       // Build system prompt with context and location instructions
       final basePrompt = '''You are a helpful travel assistant.
 
-When providing travel recommendations with specific locations (cities, landmarks, restaurants, etc.), include location data at the end of your response in this JSON format:
+CRITICAL: When providing travel recommendations with specific locations (landmarks, museums, restaurants, parks, etc.), you MUST include location data at the end of your response in this EXACT JSON format:
 
 ```json
 {
   "locations": [
-    {
-      "name": "Location Name",
-      "lat": 0.0,
-      "lng": 0.0,
-      "description": "Brief description",
-      "day": 1
-    }
+    {"name": "Location Name", "lat": 0.0, "lng": 0.0, "description": "Brief description"}
   ]
 }
 ```
 
-Important:
-- Only include the JSON block if you mention specific places
-- Use accurate coordinates (latitude/longitude)
-- The "day" field is optional (for multi-day itineraries)
-- Keep your natural response above the JSON block
+IMPORTANT RULES:
+1. Include a JSON block for EVERY place you recommend (not just one)
+2. Each location MUST have accurate, real GPS coordinates (latitude/longitude)
+3. DO NOT use placeholder coordinates like 0.0, 0.0
+4. Each location must have DIFFERENT coordinates (the actual location of that place)
+5. The "description" field is optional but helpful
+6. If the user asks for a route/directions, add: "route": {"type": "walking"} (or "driving", "cycling")
 
-Example:
-"I recommend visiting the Eiffel Tower and the Louvre Museum in Paris!
+EXAMPLE (notice MULTIPLE locations with DIFFERENT coordinates):
+"Amsterdam has amazing attractions! Here are my top picks:
+
+1. **Anne Frank House** - A moving historical museum
+2. **Rijksmuseum** - Home to Dutch masterpieces
+3. **Van Gogh Museum** - Dedicated to Van Gogh's works
+4. **Vondelpark** - Beautiful urban park
 
 ```json
 {
   "locations": [
-    {"name": "Eiffel Tower", "lat": 48.8584, "lng": 2.2945, "description": "Iconic landmark", "day": 1},
-    {"name": "Louvre Museum", "lat": 48.8606, "lng": 2.3376, "description": "World's largest art museum", "day": 1}
+    {"name": "Anne Frank House", "lat": 52.3752, "lng": 4.8840, "description": "Historical museum"},
+    {"name": "Rijksmuseum", "lat": 52.3600, "lng": 4.8852, "description": "Dutch art museum"},
+    {"name": "Van Gogh Museum", "lat": 52.3584, "lng": 4.8811, "description": "Van Gogh collection"},
+    {"name": "Vondelpark", "lat": 52.3579, "lng": 4.8686, "description": "Urban park"}
   ]
 }
 ```"
+
+Remember: Include ALL locations you mention with their REAL coordinates!
 ''';
 
       final systemPrompt = contextMessages.isEmpty

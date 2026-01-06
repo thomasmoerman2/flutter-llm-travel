@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import 'ai/ai_service.dart';
 import 'ai/ai_service_factory.dart';
 import 'firestore_access.dart';
-// import 'location_parser.dart';
+import 'location_parser.dart';
 
 /// Service to manage chat conversations and AI interactions
 class ChatService {
@@ -122,6 +123,11 @@ class ChatService {
       throw Exception('User must be logged in');
     }
 
+    String? aiMessageId;
+    ChatMessage? aiMessage;
+    String fullResponse = '';
+    bool responseCompleted = false;
+
     try {
       // Create user message
       final userMessage = ChatMessage(
@@ -153,7 +159,7 @@ class ChatService {
           .timeout(const Duration(seconds: 5));
 
       // Create placeholder for AI response
-      final aiMessage = ChatMessage(
+      aiMessage = ChatMessage(
         id: '',
         conversationId: _currentConversationId!,
         userId: user.uid,
@@ -166,8 +172,7 @@ class ChatService {
       );
 
       // Save placeholder to Firestore
-      final aiMessageId = await _firestore.addMessage(aiMessage);
-      String fullResponse = '';
+      aiMessageId = await _firestore.addMessage(aiMessage);
 
       // Stream AI response
       await for (final chunk in _currentAIService!.sendMessage(
@@ -187,6 +192,43 @@ class ChatService {
         _messageStreamController.add(updatedMessage);
       }
 
+      final parsed = LocationParser.parseLocationsAndRoute(fullResponse);
+      debugPrint('🗺️ Parsed locations: ${parsed.locations.length} found');
+      if (parsed.locations.isNotEmpty) {
+        debugPrint('📍 Location details: ${parsed.locations.map((l) => l.name).join(", ")}');
+      }
+      if (parsed.routeType != null) {
+        debugPrint('🛣️ Route type: ${parsed.routeType!.name}');
+      }
+
+      final cleanedText = parsed.cleanedText.trim();
+      final finalContent = cleanedText.isNotEmpty
+          ? cleanedText
+          : fullResponse.trim();
+
+      final responseMetadata = Map<String, dynamic>.from(
+        _currentAIService!.getResponseMetadata(),
+      );
+      if (parsed.locations.isNotEmpty) {
+        responseMetadata['locations'] =
+            parsed.locations.map((location) => location.toJson()).toList();
+        debugPrint('✅ Added locations to metadata');
+      }
+      if (parsed.routeType != null) {
+        responseMetadata['routeType'] = parsed.routeType!.name;
+        debugPrint('✅ Added routeType to metadata');
+      }
+
+      final finalMessage = aiMessage.copyWith(
+        id: aiMessageId,
+        content: finalContent,
+        status: MessageStatus.sent,
+        metadata: responseMetadata.isEmpty ? null : responseMetadata,
+      );
+      await _firestore.updateMessage(finalMessage);
+      _messageStreamController.add(finalMessage);
+      responseCompleted = true;
+
       // Update conversation
       await _updateConversation();
     } catch (e) {
@@ -205,18 +247,31 @@ class ChatService {
         errorContent = '❌ Error: ${e.toString()}';
       }
 
-      final errorMessage = ChatMessage(
-        id: '',
-        conversationId: _currentConversationId!,
-        userId: user.uid,
-        content: errorContent,
-        role: MessageRole.assistant,
-        status: MessageStatus.error,
-        model: _currentModel!,
-        timestamp: DateTime.now(),
-      );
-      final errorId = await _firestore.addMessage(errorMessage);
-      _messageStreamController.add(errorMessage.copyWith(id: errorId));
+      if (!responseCompleted && aiMessageId != null && aiMessage != null) {
+        final failureContent = fullResponse.trim().isNotEmpty
+            ? '${fullResponse.trim()}\n\n$errorContent'
+            : errorContent;
+        final errorMessage = aiMessage.copyWith(
+          id: aiMessageId,
+          content: failureContent,
+          status: MessageStatus.error,
+        );
+        await _firestore.updateMessage(errorMessage);
+        _messageStreamController.add(errorMessage);
+      } else if (!responseCompleted) {
+        final errorMessage = ChatMessage(
+          id: '',
+          conversationId: _currentConversationId!,
+          userId: user.uid,
+          content: errorContent,
+          role: MessageRole.assistant,
+          status: MessageStatus.error,
+          model: _currentModel!,
+          timestamp: DateTime.now(),
+        );
+        final errorId = await _firestore.addMessage(errorMessage);
+        _messageStreamController.add(errorMessage.copyWith(id: errorId));
+      }
       rethrow;
     }
   }
