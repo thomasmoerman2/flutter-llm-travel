@@ -1,12 +1,12 @@
 import 'dart:convert';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../services/env_config.dart';
 import '../services/theme_color.dart';
-// import '../services/mapbox_search_service.dart';
-// import '../services/mapbox_directions_service.dart';
+import '../services/mapbox_search_service.dart';
 
 /// Content-only widget for the map page (without navigation)
 /// Used inside RootLayout
@@ -30,17 +30,20 @@ class MapPageContentState extends State<MapPageContent> {
   ];
 
   late final CameraOptions _cameraOptions;
+  late final Widget _mapWidget;
   bool _hasToken = true;
   MapboxMap? _mapboxMap;
   PointAnnotationManager? _pointAnnotationManager;
   PolylineAnnotationManager? _polylineAnnotationManager;
 
   // Search state
+  List<SearchResult> _searchResults = [];
   bool _isSearching = false;
   bool _showResults = false;
   List<String> _allSuggestions = [];
   List<String> _filteredSuggestions = [];
   bool _showSuggestions = false;
+  bool _hasQuery = false;
 
   @override
   void initState() {
@@ -59,7 +62,13 @@ class MapPageContentState extends State<MapPageContent> {
       MapboxOptions.setAccessToken(token);
     }
 
+    _mapWidget = MapWidget(
+      cameraOptions: _cameraOptions,
+      onMapCreated: _onMapCreated,
+    );
+
     _searchController.addListener(_filterSuggestions);
+    _searchController.addListener(_updateQueryState);
     _searchFocusNode.addListener(_handleFocusChange);
     _loadSuggestions();
   }
@@ -89,11 +98,53 @@ class MapPageContentState extends State<MapPageContent> {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
 
+    final hadFocus = _searchFocusNode.hasFocus;
+
     setState(() {
       _isSearching = true;
       _showResults = false;
       _showSuggestions = false;
     });
+
+    try {
+      final results = await MapboxSearchService.search(query, limit: 10);
+
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+        _showResults = results.isNotEmpty;
+      });
+
+      _restoreFocusIfNeeded(hadFocus);
+
+      if (results.isNotEmpty) {
+        await _showMarkersOnMap(results);
+        await _fitCameraToResults(results);
+      }
+    } catch (e) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+        _showResults = false;
+      });
+
+      _restoreFocusIfNeeded(hadFocus);
+
+      if (!mounted) return;
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Search Error'),
+          content: Text('Failed to search: ${e.toString()}'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _loadSuggestions() async {
@@ -120,6 +171,7 @@ class MapPageContentState extends State<MapPageContent> {
 
   void _filterSuggestions() {
     final query = _searchController.text.trim().toLowerCase();
+    final hadFocus = _searchFocusNode.hasFocus;
     if (query.isEmpty) {
       if (_showSuggestions || _filteredSuggestions.isNotEmpty) {
         setState(() {
@@ -139,6 +191,32 @@ class MapPageContentState extends State<MapPageContent> {
       _filteredSuggestions = matches;
       _showSuggestions = _searchFocusNode.hasFocus && matches.isNotEmpty;
     });
+
+    if (hadFocus && !_searchFocusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_searchFocusNode.hasFocus) {
+          _searchFocusNode.requestFocus();
+        }
+      });
+    }
+  }
+
+  void _updateQueryState() {
+    final hasQuery = _searchController.text.trim().isNotEmpty;
+    if (hasQuery != _hasQuery) {
+      setState(() {
+        _hasQuery = hasQuery;
+      });
+    }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _showResults = false;
+      _showSuggestions = false;
+    });
+    _restoreFocusIfNeeded(true);
   }
 
   void _selectSuggestion(String suggestion) {
@@ -148,6 +226,17 @@ class MapPageContentState extends State<MapPageContent> {
     );
     setState(() {
       _showSuggestions = false;
+    });
+    _restoreFocusIfNeeded(true);
+    _performSearch();
+  }
+
+  void _restoreFocusIfNeeded(bool hadFocus) {
+    if (!hadFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_searchFocusNode.hasFocus) {
+        _searchFocusNode.requestFocus();
+      }
     });
   }
 
@@ -210,8 +299,77 @@ class MapPageContentState extends State<MapPageContent> {
   }
 
   /// Show markers for search results
+  Future<void> _showMarkersOnMap(List<SearchResult> results) async {
+    if (_pointAnnotationManager == null) return;
+
+    await _pointAnnotationManager!.deleteAll();
+
+    final annotations = results.map((result) {
+      return PointAnnotationOptions(
+        geometry: Point(
+          coordinates: Position(result.longitude, result.latitude),
+        ),
+        iconImage: 'marker-15',
+        iconSize: 1.5,
+        iconAnchor: IconAnchor.BOTTOM,
+      );
+    }).toList();
+
+    await _pointAnnotationManager!.createMulti(annotations);
+  }
 
   /// Fit camera to show all search results
+  Future<void> _fitCameraToResults(List<SearchResult> results) async {
+    if (_mapboxMap == null || results.isEmpty) return;
+
+    if (results.length == 1) {
+      final result = results.first;
+      final zoom = _getZoomLevelForPlaceType(result.placeType);
+      await _mapboxMap!.flyTo(
+        CameraOptions(
+          center: Point(
+            coordinates: Position(result.longitude, result.latitude),
+          ),
+          zoom: zoom,
+          pitch: 0,
+          bearing: 0,
+        ),
+        MapAnimationOptions(duration: 1000, startDelay: 0),
+      );
+      return;
+    }
+
+    double minLng = results.first.longitude;
+    double maxLng = results.first.longitude;
+    double minLat = results.first.latitude;
+    double maxLat = results.first.latitude;
+
+    for (final result in results) {
+      if (result.longitude < minLng) minLng = result.longitude;
+      if (result.longitude > maxLng) maxLng = result.longitude;
+      if (result.latitude < minLat) minLat = result.latitude;
+      if (result.latitude > maxLat) maxLat = result.latitude;
+    }
+
+    final padding = 0.1;
+    final lngPadding = (maxLng - minLng) * padding;
+    final latPadding = (maxLat - minLat) * padding;
+
+    await _mapboxMap!.flyTo(
+      CameraOptions(
+        center: Point(
+          coordinates: Position((minLng + maxLng) / 2, (minLat + maxLat) / 2),
+        ),
+        zoom: _calculateZoomLevel(
+          maxLng - minLng + lngPadding * 2,
+          maxLat - minLat + latPadding * 2,
+        ),
+        pitch: 0,
+        bearing: 0,
+      ),
+      MapAnimationOptions(duration: 1500, startDelay: 0),
+    );
+  }
 
   /// Calculate appropriate zoom level based on bounds
   double _calculateZoomLevel(double lngSpan, double latSpan) {
@@ -230,6 +388,25 @@ class MapPageContentState extends State<MapPageContent> {
   }
 
   /// Navigate to a specific search result
+  Future<void> _goToResult(SearchResult result) async {
+    if (_mapboxMap == null) return;
+
+    setState(() {
+      _showResults = false;
+    });
+
+    final zoom = _getZoomLevelForPlaceType(result.placeType);
+
+    await _mapboxMap!.flyTo(
+      CameraOptions(
+        center: Point(coordinates: Position(result.longitude, result.latitude)),
+        zoom: zoom,
+        pitch: 0,
+        bearing: 0,
+      ),
+      MapAnimationOptions(duration: 1000, startDelay: 0),
+    );
+  }
 
   /// Get appropriate zoom level based on place type
   double _getZoomLevelForPlaceType(String? placeType) {
@@ -272,21 +449,170 @@ class MapPageContentState extends State<MapPageContent> {
 
     return Stack(
       children: [
-        MapWidget(cameraOptions: _cameraOptions, onMapCreated: _onMapCreated),
+        Focus(canRequestFocus: false, skipTraversal: true, child: _mapWidget),
 
         // Local suggestions list
         if (!_showResults &&
             _showSuggestions &&
             _filteredSuggestions.isNotEmpty)
           Positioned(
+            key: const ValueKey('map_suggestions'),
             left: 16,
             right: 16,
             bottom: widget.bottomInset + 80,
             child: _buildSuggestionsList(),
           ),
 
+        // Search results list
+        if (_showResults && _searchResults.isNotEmpty)
+          Positioned(
+            key: const ValueKey('map_results'),
+            left: 16,
+            right: 16,
+            bottom: widget.bottomInset + 80,
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              ),
+              decoration: BoxDecoration(
+                color: ThemeColor.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1A000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Color(0x1A000000), width: 1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Search Results',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: ThemeColor.textPrimary,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _showResults = false;
+                            });
+                          },
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: ThemeColor.background,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              LucideIcons.x,
+                              size: 16,
+                              color: ThemeColor.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        final result = _searchResults[index];
+                        return GestureDetector(
+                          onTap: () => _goToResult(result),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: ThemeColor.background,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: ThemeColor.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Icon(
+                                    LucideIcons.mapPin,
+                                    size: 20,
+                                    color: ThemeColor.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        result.shortName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: ThemeColor.textPrimary,
+                                        ),
+                                      ),
+                                      if (result.subtitle.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          result.subtitle,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: ThemeColor.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  LucideIcons.chevronRight,
+                                  size: 16,
+                                  color: ThemeColor.textSecondary,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
         // Search bar
         Positioned(
+          key: const ValueKey('map_search_bar'),
           left: 16,
           right: 16,
           bottom: widget.bottomInset,
@@ -309,7 +635,7 @@ class MapPageContentState extends State<MapPageContent> {
                   child: CupertinoTextField(
                     controller: _searchController,
                     focusNode: _searchFocusNode,
-                    placeholder: 'Where do you want to go?',
+                    placeholder: 'map.input_placeholder'.tr(),
                     placeholderStyle: const TextStyle(
                       color: ThemeColor.textSecondary,
                       fontSize: 14,
@@ -329,6 +655,25 @@ class MapPageContentState extends State<MapPageContent> {
                     onSubmitted: (_) => _performSearch(),
                   ),
                 ),
+                if (_hasQuery) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _clearSearch,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: ThemeColor.textSecondary.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        LucideIcons.x,
+                        size: 14,
+                        color: ThemeColor.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 10),
                 GestureDetector(
                   onTap: _isSearching ? null : _performSearch,
@@ -399,11 +744,11 @@ class MapPageContentState extends State<MapPageContent> {
                               icon: LucideIcons.x,
                               onTap: () => Navigator.pop(context),
                             ),
-                            const Expanded(
+                            Expanded(
                               child: Center(
                                 child: Text(
-                                  'Saved routes',
-                                  style: TextStyle(
+                                  'map.saved_routes'.tr(),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                     color: ThemeColor.textPrimary,
@@ -421,9 +766,9 @@ class MapPageContentState extends State<MapPageContent> {
                         const SizedBox(height: 16),
                         Expanded(
                           child: _savedRoutes.isEmpty
-                              ? const Center(
+                              ? Center(
                                   child: Text(
-                                    'No saved routes yet.',
+                                    'map.no_saved_routes'.tr(),
                                     style: TextStyle(
                                       color: ThemeColor.textSecondary,
                                       fontSize: 14,

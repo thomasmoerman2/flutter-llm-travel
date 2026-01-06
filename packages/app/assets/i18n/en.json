@@ -60,5 +60,10 @@
     "help_check_internet": "Check your internet connection",
     "help_check_server": "Ensure the backend server is running at localhost:5189",
     "help_check_env": "Verify API_BASE_URL and WS_BASE_URL in .env file"
+  },
+  "map": {
+    "input_placeholder": "Where do you want to go?",
+    "saved_routes": "Saved routes",
+    "no_saved_routes": "No saved routes yet"
   }
 }

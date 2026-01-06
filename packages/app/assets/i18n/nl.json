@@ -60,5 +60,10 @@
     "help_check_internet": "Controleer je internetverbinding",
     "help_check_server": "Zorg ervoor dat de backend server draait op localhost:5189",
     "help_check_env": "Controleer API_BASE_URL en WS_BASE_URL in het .env bestand"
+  },
+  "map": {
+    "input_placeholder": "Waar zou je naartoe willen gaan?",
+    "saved_routes": "Opgeslagen routes",
+    "no_saved_routes": "Geen opgeslagen routes"
   }
 }

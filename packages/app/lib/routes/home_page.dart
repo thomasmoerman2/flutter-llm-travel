@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:app/routes/login_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,7 +16,6 @@ import '../widgets/chat_message_bubble.dart';
 /// Used inside RootLayout
 class HomePageContent extends StatefulWidget {
   final String? initialModel;
-  // final void Function(List<LocationData> locations, RouteType routeType)? onShowLocationsOnMap;
 
   const HomePageContent({super.key, this.initialModel});
 
@@ -264,7 +264,10 @@ class HomePageContentState extends State<HomePageContent>
             onPressed: () {
               Navigator.pop(context);
               // Navigate to login page
-              Navigator.pushNamed(context, '/login');
+              Navigator.push(
+                context,
+                CupertinoPageRoute(builder: (context) => const LoginPage()),
+              );
             },
           ),
         ],
@@ -375,64 +378,113 @@ class HomePageContentState extends State<HomePageContent>
       curve: Curves.easeOut,
       child: Column(
         children: [
+          // Messages list
+          Expanded(
+            child: _messages.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.only(top: 16, bottom: 16),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      return ChatMessageBubble(
+                        message: message,
+                        showModel:
+                            index == 0 ||
+                            message.model != _messages[index - 1].model,
+                      );
+                    },
+                  ),
+          ),
+
           // Input field
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ThemeColor.background,
-              border: Border(
-                top: BorderSide(
-                  color: ThemeColor.textSecondary.withOpacity(0.1),
-                  width: 1,
+          SafeArea(
+            top: false,
+            bottom: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: BoxDecoration(
+                color: ThemeColor.background,
+                border: Border(
+                  top: BorderSide(
+                    color: ThemeColor.textSecondary.withOpacity(0.1),
+                    width: 1,
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: CupertinoTextField(
-                    controller: _textController,
-                    placeholder: 'home.input_placeholder'.tr(),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _handleSend(),
-                    enabled: !_isSending,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: ThemeColor.inputBackground,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getModelIcon(_currentModel),
+                        size: 14,
+                        color: ThemeColor.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _currentModel,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: ThemeColor.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: _isSending ? null : _handleSend,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _isSending
-                          ? ThemeColor.textSecondary.withOpacity(0.3)
-                          : ThemeColor.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: _isSending
-                        ? const Center(
-                            child: CupertinoActivityIndicator(
-                              color: ThemeColor.background,
-                            ),
-                          )
-                        : const Icon(
-                            LucideIcons.send,
-                            size: 20,
-                            color: ThemeColor.background,
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CupertinoTextField(
+                          controller: _textController,
+                          placeholder: 'home.input_placeholder'.tr(),
+                          maxLines: null,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _handleSend(),
+                          enabled: !_isSending,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
+                          decoration: BoxDecoration(
+                            color: ThemeColor.inputBackground,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _isSending ? null : _handleSend,
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: _isSending
+                                ? ThemeColor.textSecondary.withOpacity(0.3)
+                                : ThemeColor.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: _isSending
+                              ? const Center(
+                                  child: CupertinoActivityIndicator(
+                                    color: ThemeColor.background,
+                                  ),
+                                )
+                              : const Icon(
+                                  LucideIcons.send,
+                                  size: 20,
+                                  color: ThemeColor.background,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
