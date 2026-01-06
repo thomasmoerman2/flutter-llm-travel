@@ -4,6 +4,7 @@ import '../models/chat_message.dart';
 import 'ai/ai_service.dart';
 import 'ai/ai_service_factory.dart';
 import 'firestore_access.dart';
+// import 'location_parser.dart';
 
 /// Service to manage chat conversations and AI interactions
 class ChatService {
@@ -17,7 +18,10 @@ class ChatService {
   Stream<ChatMessage> get messageStream => _messageStreamController.stream;
 
   /// Initialize or switch to a conversation
-  Future<String> initializeConversation(String model, {String? conversationId}) async {
+  Future<String> initializeConversation(
+    String model, {
+    String? conversationId,
+  }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('User must be logged in to chat');
@@ -38,12 +42,17 @@ class ChatService {
         updatedAt: DateTime.now(),
         messageCount: 0,
       );
-      _currentConversationId = await _firestore.createConversation(conversation);
+      _currentConversationId = await _firestore.createConversation(
+        conversation,
+      );
     }
 
     // NOW switch AI service if model changed (with conversationId available)
-    final conversationChanged = previousConversationId != _currentConversationId;
-    if (_currentAIService == null || _currentModel != model || conversationChanged) {
+    final conversationChanged =
+        previousConversationId != _currentConversationId;
+    if (_currentAIService == null ||
+        _currentModel != model ||
+        conversationChanged) {
       await _switchModel(model);
     }
 
@@ -75,11 +84,15 @@ class ChatService {
         updatedAt: DateTime.now(),
         messageCount: 0,
       );
-      _currentConversationId = await _firestore.createConversation(conversation);
+      _currentConversationId = await _firestore.createConversation(
+        conversation,
+      );
       createdConversation = true;
     }
 
-    if (_currentAIService == null || _currentModel != model || createdConversation) {
+    if (_currentAIService == null ||
+        _currentModel != model ||
+        createdConversation) {
       await _switchModel(model);
     }
 
@@ -174,15 +187,6 @@ class ChatService {
         _messageStreamController.add(updatedMessage);
       }
 
-      // Mark as complete
-      final finalMessage = aiMessage.copyWith(
-        id: aiMessageId,
-        content: fullResponse,
-        status: MessageStatus.sent,
-      );
-      await _firestore.updateMessage(finalMessage);
-      _messageStreamController.add(finalMessage);
-
       // Update conversation
       await _updateConversation();
     } catch (e) {
@@ -190,9 +194,11 @@ class ChatService {
       String errorContent;
       if (e is AIServiceException && e.code == 'TIMEOUT') {
         // Custom timeout message
-        errorContent = '⏱️ The AI took too long to respond (timeout after 60 seconds). Please try again with a simpler question, or check your internet connection.';
+        errorContent =
+            '⏱️ The AI took too long to respond (timeout after 60 seconds). Please try again with a simpler question, or check your internet connection.';
       } else if (e is AIServiceException && e.code == 'CONNECTION_ERROR') {
-        errorContent = '🔌 Connection error. Please check if the backend server is running and try again.';
+        errorContent =
+            '🔌 Connection error. Please check if the backend server is running and try again.';
       } else if (e is AIServiceException && e.code == 'SERVER_ERROR') {
         errorContent = '⚠️ Server error: ${e.message}';
       } else {
@@ -222,11 +228,15 @@ class ChatService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final messages = await _firestore.getMessages(_currentConversationId!).first;
+    final messages = await _firestore
+        .getMessages(_currentConversationId!)
+        .first;
     final conversation = Conversation(
       id: _currentConversationId!,
       userId: user.uid,
-      title: messages.isNotEmpty ? _generateTitle(messages.first.content) : 'New Conversation',
+      title: messages.isNotEmpty
+          ? _generateTitle(messages.first.content)
+          : 'New Conversation',
       currentModel: _currentModel!,
       createdAt: DateTime.now(), // Would need to fetch actual creation time
       updatedAt: DateTime.now(),

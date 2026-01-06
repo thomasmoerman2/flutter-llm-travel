@@ -79,10 +79,47 @@ class RestAIService implements AIService {
           .map((msg) => '${msg.isUser ? "User" : "Assistant"}: ${msg.content}')
           .join('\n');
 
-      // Build system prompt with context
+      // Build system prompt with context and location instructions
+      final basePrompt = '''You are a helpful travel assistant.
+
+When providing travel recommendations with specific locations (cities, landmarks, restaurants, etc.), include location data at the end of your response in this JSON format:
+
+```json
+{
+  "locations": [
+    {
+      "name": "Location Name",
+      "lat": 0.0,
+      "lng": 0.0,
+      "description": "Brief description",
+      "day": 1
+    }
+  ]
+}
+```
+
+Important:
+- Only include the JSON block if you mention specific places
+- Use accurate coordinates (latitude/longitude)
+- The "day" field is optional (for multi-day itineraries)
+- Keep your natural response above the JSON block
+
+Example:
+"I recommend visiting the Eiffel Tower and the Louvre Museum in Paris!
+
+```json
+{
+  "locations": [
+    {"name": "Eiffel Tower", "lat": 48.8584, "lng": 2.2945, "description": "Iconic landmark", "day": 1},
+    {"name": "Louvre Museum", "lat": 48.8606, "lng": 2.3376, "description": "World's largest art museum", "day": 1}
+  ]
+}
+```"
+''';
+
       final systemPrompt = contextMessages.isEmpty
-          ? 'You are a helpful travel assistant.'
-          : 'You are a helpful travel assistant.\n\nConversation history:\n$contextMessages';
+          ? basePrompt
+          : '$basePrompt\n\nConversation history:\n$contextMessages';
 
       // Prepare request body matching backend API
       final requestBody = {

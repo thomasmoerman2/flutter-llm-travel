@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../models/chat_message.dart';
 import '../services/firestore_access.dart';
 import '../services/theme_color.dart';
+// import '../services/mapbox_directions_service.dart';
 import '../widgets/top_navigation_bar.dart';
 import '../widgets/bottom_navigation.dart';
 import '../widgets/conversation_sidebar.dart';
@@ -72,8 +73,7 @@ class _RootLayoutState extends State<RootLayout> {
   Future<void> _handleDeleteConversation(Conversation conversation) async {
     await _firestore.deleteConversation(conversation.id);
     final state = _homePageKey.currentState;
-    if (state != null &&
-        state.currentConversationId == conversation.id) {
+    if (state != null && state.currentConversationId == conversation.id) {
       await state.startNewConversation();
       setState(() {
         _currentIndex = 0;
@@ -84,6 +84,8 @@ class _RootLayoutState extends State<RootLayout> {
   void _openSavedRoutesSheet() {
     _mapPageKey.currentState?.showSavedRoutesSheet();
   }
+
+  /// Show locations on map with route
 
   void _navigateToSettings() async {
     if (_isSidebarOpen) {
@@ -116,10 +118,7 @@ class _RootLayoutState extends State<RootLayout> {
       key: ValueKey(context.locale.toString()),
       children: [
         HomePageContent(key: _homePageKey),
-        MapPageContent(
-          key: _mapPageKey,
-          bottomInset: mapBottomInset,
-        ),
+        MapPageContent(key: _mapPageKey, bottomInset: mapBottomInset),
       ],
     );
 
@@ -157,9 +156,7 @@ class _RootLayoutState extends State<RootLayout> {
               ),
 
               // Dynamic Content based on selected index
-              Expanded(
-                child: pageStack,
-              ),
+              Expanded(child: pageStack),
 
               // Persistent Bottom Navigation
               BottomNavigation(
@@ -173,10 +170,7 @@ class _RootLayoutState extends State<RootLayout> {
       children: [
         IgnorePointer(
           ignoring: _isSidebarOpen,
-          child: Container(
-            color: ThemeColor.background,
-            child: content,
-          ),
+          child: Container(color: ThemeColor.background, child: content),
         ),
         Positioned.fill(
           child: IgnorePointer(
@@ -187,9 +181,7 @@ class _RootLayoutState extends State<RootLayout> {
                 opacity: _isSidebarOpen ? 1 : 0,
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOut,
-                child: Container(
-                  color: const Color(0x33000000),
-                ),
+                child: Container(color: const Color(0x33000000)),
               ),
             ),
           ),
@@ -202,7 +194,8 @@ class _RootLayoutState extends State<RootLayout> {
           bottom: 0,
           child: ConversationSidebar(
             width: sidebarWidth,
-            selectedConversationId: _homePageKey.currentState?.currentConversationId,
+            selectedConversationId:
+                _homePageKey.currentState?.currentConversationId,
             onNewConversation: _handleNewConversation,
             onSelectConversation: _handleOpenConversation,
             onDeleteConversation: _handleDeleteConversation,

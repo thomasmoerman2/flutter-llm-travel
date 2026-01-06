@@ -8,12 +8,14 @@ import '../services/chat_service.dart';
 import '../services/firestore_access.dart';
 import '../services/preferences_service.dart';
 import '../services/theme_color.dart';
+// import '../services/mapbox_directions_service.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// Content-only widget for the home page (without navigation)
 /// Used inside RootLayout
 class HomePageContent extends StatefulWidget {
   final String? initialModel;
+  // final void Function(List<LocationData> locations, RouteType routeType)? onShowLocationsOnMap;
 
   const HomePageContent({super.key, this.initialModel});
 
@@ -21,7 +23,8 @@ class HomePageContent extends StatefulWidget {
   State<HomePageContent> createState() => HomePageContentState();
 }
 
-class HomePageContentState extends State<HomePageContent> with WidgetsBindingObserver {
+class HomePageContentState extends State<HomePageContent>
+    with WidgetsBindingObserver {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ChatService _chatService = ChatService();
@@ -33,6 +36,7 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
   List<ChatMessage> _messages = [];
   bool _isInitialized = false;
   bool _isSending = false;
+  DateTime? _lastScrollTime;
 
   String? get currentConversationId => _conversationId;
 
@@ -75,7 +79,9 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
         } else {
           // If conversation not initialized yet, just update the model
           // It will use the new model when initialized
-          debugPrint('💡 Conversation not initialized yet, will use $newModel on next message');
+          debugPrint(
+            '💡 Conversation not initialized yet, will use $newModel on next message',
+          );
         }
       } catch (e) {
         debugPrint('⚠️ Error switching model: $e');
@@ -138,6 +144,14 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
   }
 
   void _scrollToBottom() {
+    // Throttle scroll animations to prevent flickering during streaming
+    final now = DateTime.now();
+    if (_lastScrollTime != null &&
+        now.difference(_lastScrollTime!) < const Duration(milliseconds: 500)) {
+      return; // Skip if we scrolled recently
+    }
+    _lastScrollTime = now;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -151,25 +165,41 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
 
   void _subscribeToConversation(String conversationId) {
     _messagesSubscription?.cancel();
-    _messagesSubscription = _firestore.getMessages(conversationId).listen(
-      (messages) {
-        debugPrint('📨 Received ${messages.length} messages from Firestore');
-        if (mounted) {
-          setState(() {
-            _messages = messages;
-          });
-          _scrollToBottom();
-        }
-      },
-      onError: (error) {
-        debugPrint('⚠️ Firestore listener error: $error');
-        // If index missing, show helpful message
-        if (error.toString().contains('requires an index')) {
-          debugPrint('💡 Please create the Firestore index using: firebase deploy --only firestore:indexes');
-        }
-        // Continue without Firestore - WebSocket will still work
-      },
-    );
+    _messagesSubscription = _firestore
+        .getMessages(conversationId)
+        .listen(
+          (messages) {
+            debugPrint(
+              '📨 Received ${messages.length} messages from Firestore',
+            );
+            if (mounted) {
+              // Check if we should update (avoid rebuilds during rapid streaming)
+              final shouldUpdate =
+                  _messages.isEmpty ||
+                  messages.length != _messages.length ||
+                  (messages.isNotEmpty &&
+                      _messages.isNotEmpty &&
+                      messages.last.content != _messages.last.content);
+
+              if (shouldUpdate) {
+                setState(() {
+                  _messages = messages;
+                });
+                _scrollToBottom();
+              }
+            }
+          },
+          onError: (error) {
+            debugPrint('⚠️ Firestore listener error: $error');
+            // If index missing, show helpful message
+            if (error.toString().contains('requires an index')) {
+              debugPrint(
+                '💡 Please create the Firestore index using: firebase deploy --only firestore:indexes',
+              );
+            }
+            // Continue without Firestore - WebSocket will still work
+          },
+        );
   }
 
   Future<void> startNewConversation() async {
@@ -259,8 +289,9 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
         // Logged-in user: Use ChatService (saves to Firestore)
         debugPrint('💬 Sending message: $text');
         final hadNoConversation = _conversationId == null;
-        final conversationId =
-            await _chatService.ensureConversation(_currentModel);
+        final conversationId = await _chatService.ensureConversation(
+          _currentModel,
+        );
         if (!mounted) return;
         if (_conversationId != conversationId) {
           setState(() {
@@ -288,7 +319,6 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
       }
     }
   }
-
 
   void _showError(String message) {
     showCupertinoDialog(
@@ -334,9 +364,7 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const Center(
-        child: CupertinoActivityIndicator(),
-      );
+      return const Center(child: CupertinoActivityIndicator());
     }
 
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
@@ -347,24 +375,6 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
       curve: Curves.easeOut,
       child: Column(
         children: [
-          // Messages list
-          Expanded(
-            child: _messages.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(top: 16, bottom: 16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      return ChatMessageBubble(
-                        message: _messages[index],
-                        showModel: index == 0 ||
-                            _messages[index].model != _messages[index - 1].model,
-                      );
-                    },
-                  ),
-          ),
-
           // Input field
           Container(
             padding: const EdgeInsets.all(16),

@@ -7,11 +7,13 @@ import '../services/theme_color.dart';
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool showModel;
+  final VoidCallback? onShowOnMap;
 
   const ChatMessageBubble({
     super.key,
     required this.message,
     this.showModel = false,
+    this.onShowOnMap,
   });
 
   @override
@@ -36,8 +38,10 @@ class ChatMessageBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 color: message.hasError
                     ? (isUser
-                        ? ThemeColor.primary.withOpacity(0.8)
-                        : const Color(0xFFFFEBEE)) // Light red for error messages
+                          ? ThemeColor.primary.withOpacity(0.8)
+                          : const Color(
+                              0xFFFFEBEE,
+                            )) // Light red for error messages
                     : (isUser ? ThemeColor.primary : ThemeColor.surface),
                 borderRadius: BorderRadius.circular(20),
                 border: message.hasError
@@ -85,6 +89,37 @@ class ChatMessageBubble extends StatelessWidget {
                     ),
                   ),
 
+                  // Show on Map button (for AI messages with locations)
+                  if (!isUser &&
+                      message.hasLocations &&
+                      onShowOnMap != null) ...[
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: onShowOnMap,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ThemeColor.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              LucideIcons.map,
+                              size: 16,
+                              color: ThemeColor.background,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
                   // Status indicators
                   if (message.isStreaming || message.isSending) ...[
                     const SizedBox(height: 8),
@@ -126,7 +161,9 @@ class ChatMessageBubble extends StatelessWidget {
                           size: 14,
                           color: isUser
                               ? ThemeColor.background
-                              : const Color(0xFFEF5350), // Red color for error icon
+                              : const Color(
+                                  0xFFEF5350,
+                                ), // Red color for error icon
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -136,7 +173,9 @@ class ChatMessageBubble extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                             color: isUser
                                 ? ThemeColor.background.withOpacity(0.8)
-                                : const Color(0xFFEF5350), // Red color for error text
+                                : const Color(
+                                    0xFFEF5350,
+                                  ), // Red color for error text
                           ),
                         ),
                       ],
@@ -177,7 +216,9 @@ class ChatMessageBubble extends StatelessWidget {
     } else if (difference.inDays < 7) {
       return DateFormat('E HH:mm').format(timestamp); // e.g., "Mon 14:30"
     } else {
-      return DateFormat('MMM d, HH:mm').format(timestamp); // e.g., "Jan 6, 14:30"
+      return DateFormat(
+        'MMM d, HH:mm',
+      ).format(timestamp); // e.g., "Jan 6, 14:30"
     }
   }
 
