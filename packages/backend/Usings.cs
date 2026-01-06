@@ -26,7 +26,6 @@ global using Microsoft.AspNetCore.Authorization;
 global using Microsoft.AspNetCore.Builder;
 global using Microsoft.AspNetCore.Cors;
 global using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.AspNetCore.OpenApi;
 global using Microsoft.AspNetCore.RateLimiting;
 global using Microsoft.Extensions.Caching.Memory;
@@ -59,9 +58,7 @@ global using System.Text.Json;
 global using System.Text;
 
 // backend Usings
-global using backend.Context;
 global using backend.Exceptions;
-global using backend.Models;
 global using backend.Routes;
 global using backend.Services.Llm;
 global using backend.Services;

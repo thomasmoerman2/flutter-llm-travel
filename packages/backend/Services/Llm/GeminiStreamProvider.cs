@@ -9,7 +9,9 @@ public sealed class GeminiStreamProvider : ILlmStreamProvider
         _configuration = configuration;
     }
     public string Name => "gemini";
-    public async IAsyncEnumerable<string> StreamAsync(LlmRequest request, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<string> StreamAsync(
+        LlmRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var apiKey = _configuration["GeminiApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))

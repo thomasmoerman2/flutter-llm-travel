@@ -29,7 +29,7 @@ Request body (JSON):
 ```json
 {
   "prompt": "Plan a 2-day Tokyo trip",
-  "model": "gpt-4o",
+  "model": "gpt-4.1",
   "systemPrompt": "You are a travel planner",
   "sessionId": "abc123"
 }
@@ -60,8 +60,8 @@ Required for LLM providers:
 - `GeminiApiKey`
 
 Optional:
-- `OpenAiModel` (default: `gpt-4o`)
-- `GeminiModel` (default: `gemini-2.0-flash`)
+- `OpenAiModel` (default: `gpt-4.1`)
+- `GeminiModel` (default: `gemini-1.5-flash`)
 - `FoundationPrompt` (prefix used in hybrid mode)
 
 ## Notes

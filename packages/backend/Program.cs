@@ -33,7 +33,6 @@ builder.Services.AddSingleton<OpenAiStreamProvider>();
 builder.Services.AddSingleton<GeminiStreamProvider>();
 builder.Services.AddSingleton<HybridStreamProvider>();
 builder.Services.AddSingleton<ILlmRequestLimiter, LlmRequestLimiter>();
-builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -56,10 +55,21 @@ else
 {
     throw new InvalidOperationException("Firebase credentials are missing. Set the FirebaseCredentials environment variable.");
 }
+
+var openAiApiKey = builder.Configuration["OpenAiApiKey"];
+var geminiApiKey = builder.Configuration["GeminiApiKey"];
+if (string.IsNullOrWhiteSpace(openAiApiKey) && string.IsNullOrWhiteSpace(geminiApiKey))
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        Console.WriteLine("Warning: OpenAiApiKey and GeminiApiKey are not set. AI endpoints will fail.");
+    }
+    else
+    {
+        throw new InvalidOperationException("AI API keys are missing. Set OpenAiApiKey and/or GeminiApiKey.");
+    }
+}
 builder.Services.AddFirebaseAuthentication();
-var mongoSettings = builder.Configuration.GetSection("MongoDB");
-builder.Services.Configure<DatabaseSettings>(mongoSettings);
-builder.Services.AddScoped<IMongoContext, MongoContext>();
 builder.Services.AddApiVersioning(options =>
 {
     options.ReportApiVersions = true;
@@ -104,5 +114,5 @@ var versionSet = app.NewApiVersionSet()
 // Routes
 app.MapSystemRoutes();
 app.MapApiRoutes(versionSet);
-app.MapControllers();
+app.MapAiRoutes();
 app.Run();

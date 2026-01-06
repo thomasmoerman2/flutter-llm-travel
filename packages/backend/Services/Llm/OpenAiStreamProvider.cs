@@ -9,7 +9,9 @@ public sealed class OpenAiStreamProvider : ILlmStreamProvider
         _configuration = configuration;
     }
     public string Name => "chatgpt";
-    public async IAsyncEnumerable<string> StreamAsync(LlmRequest request, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<string> StreamAsync(
+        LlmRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var apiKey = _configuration["OpenAiApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -17,7 +19,7 @@ public sealed class OpenAiStreamProvider : ILlmStreamProvider
             throw new InvalidOperationException("OpenAiApiKey is missing.");
         }
         var model = string.IsNullOrWhiteSpace(request.Model)
-            ? _configuration["OpenAiModel"] ?? "gpt-4o"
+            ? _configuration["OpenAiModel"] ?? "gpt-4.1"
             : request.Model;
         var messages = new List<object>();
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
