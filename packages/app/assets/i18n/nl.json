@@ -1,0 +1,64 @@
+{
+  "home": {
+    "title": "Hoe kan ik jou helpen met reizen?",
+    "subtitle": "Leg mij uit naar waar je zou reizen en hoe je zaken zou willen doen.",
+    "input_placeholder": "Ik zou graag reizen naar..."
+  },
+  "settings": {
+    "title": "Instellingen",
+    "back": "Back",
+    "account_section": "Account",
+    "password_changed": "Wachtwoord • {days} dagen geleden gewijzigd",
+    "account_created": "Account • {days} dagen geleden aangemaakt",
+    "apple_intelligence_requirement": "Apple Intelligence is alleen beschikbaar op iOS-apparaten met iOS 18.0 of hoger",
+    "connection_status": "Verbindingsstatus",
+    "language": "Taal",
+    "ai_section": "Artificial Intelligence",
+    "model": "Standaard Model",
+    "connect": "Verbinden of account aanmaken",
+    "disconnect": "Uitloggen"
+  },
+  "navigation": {
+    "chat": "Chat",
+    "map": "Kaart",
+    "settings": "Instellingen",
+    "menu": "Menu"
+  },
+  "languages": {
+    "nl": "Nederlands",
+    "en": "English",
+    "fr": "Français"
+  },
+  "models": {
+    "on_device": "on-device",
+    "chatgpt": "ChatGPT",
+    "gemini": "Gemini",
+    "hybrid": "Hybrid"
+  },
+  "model_description": {
+    "chatgpt": "Gebruikt OpenAI's ChatGPT voor geavanceerde AI-antwoorden. Internetverbinding vereist.",
+    "gemini": "Gebruikt Google's Gemini AI voor uitgebreide ondersteuning. Internetverbinding vereist.",
+    "hybrid": "Combineert lokale en cloud-verwerking voor optimale prestaties en privacy.",
+    "apple_intelligence": "Verwerking vindt plaats op je apparaat. Volledig privé en werkt offline. Gebruikt Apple's on-device intelligentie voor privé en veilige AI-verwerking. Alleen beschikbaar vanaf iOS 18.0+."
+  },
+  "connection_status": {
+    "title": "Verbindingsstatus",
+    "api_connection": "API Verbinding",
+    "websocket_connection": "WebSocket Verbinding",
+    "status": "Status",
+    "connected": "Verbonden",
+    "disconnected": "Niet verbonden",
+    "error": "Fout",
+    "checking": "Controleren...",
+    "issues_detected": "Problemen Gedetecteerd",
+    "all_systems_operational": "Alle Systemen Operationeel",
+    "last_checked": "Laatst gecontroleerd {time}",
+    "just_now": "zojuist",
+    "minutes_ago": "{count}m geleden",
+    "hours_ago": "{count}u geleden",
+    "troubleshooting": "Probleemoplossing",
+    "help_check_internet": "Controleer je internetverbinding",
+    "help_check_server": "Zorg ervoor dat de backend server draait op localhost:5189",
+    "help_check_env": "Controleer API_BASE_URL en WS_BASE_URL in het .env bestand"
+  }
+}

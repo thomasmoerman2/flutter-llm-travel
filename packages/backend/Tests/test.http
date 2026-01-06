@@ -1,0 +1,27 @@
+@baseUrl=http://localhost:<correct-port>
+
+GET {{baseUrl}}/
+
+###
+POST {{baseUrl}}/
+Content-Type: application/json
+
+{
+  "object" : "value"
+}
+
+###
+PUT {{baseUrl}}/
+Content-Type: application/json
+
+{
+  "object" : "value"
+}
+
+###
+DELETE {{baseUrl}}/
+Content-Type: application/json
+
+{
+  "object" : "value"
+}

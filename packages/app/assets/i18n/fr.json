@@ -1,0 +1,64 @@
+{
+  "home": {
+    "title": "Comment puis-je vous aider avec les voyages?",
+    "subtitle": "Dites-moi où vous aimeriez voyager et comment vous aimeriez faire les choses.",
+    "input_placeholder": "J'aimerais voyager à..."
+  },
+  "settings": {
+    "title": "Paramètres",
+    "back": "Retour",
+    "account_section": "Compte",
+    "password_changed": "Mot de passe • Modifié il y a {days} jours",
+    "account_created": "Compte • Créé il y a {days} jours",
+    "apple_intelligence_requirement": "Apple Intelligence est uniquement disponible sur les appareils iOS avec iOS 18.0 ou supérieur",
+    "connection_status": "État de la connexion",
+    "language": "Langue",
+    "ai_section": "Intelligence Artificielle",
+    "model": "Modèle par defaut",
+    "connect": "Se connecter ou créer un compte",
+    "disconnect": "Se déconnecter"
+  },
+  "navigation": {
+    "chat": "Chat",
+    "map": "Carte",
+    "settings": "Paramètres",
+    "menu": "Menu"
+  },
+  "languages": {
+    "nl": "Néerlandais",
+    "en": "Anglais",
+    "fr": "Français"
+  },
+  "models": {
+    "on_device": "sur l'appareil",
+    "chatgpt": "ChatGPT",
+    "gemini": "Gemini",
+    "hybrid": "Hybride"
+  },
+  "model_description": {
+    "chatgpt": "Utilise ChatGPT d'OpenAI pour des réponses IA avancées. Connexion Internet requise.",
+    "gemini": "Utilise Gemini AI de Google pour un support complet. Connexion Internet requise.",
+    "hybrid": "Combine le traitement local et cloud pour des performances et une confidentialité optimales.",
+    "apple_intelligence": "Le traitement se fait sur votre appareil. Totalement privé et fonctionne hors ligne. Utilise l'intelligence sur appareil d'Apple pour un traitement IA privé et sécurisé. Disponible uniquement à partir d'iOS 18.0+."
+  },
+  "connection_status": {
+    "title": "État de la Connexion",
+    "api_connection": "Connexion API",
+    "websocket_connection": "Connexion WebSocket",
+    "status": "Statut",
+    "connected": "Connecté",
+    "disconnected": "Déconnecté",
+    "error": "Erreur",
+    "checking": "Vérification...",
+    "issues_detected": "Problèmes Détectés",
+    "all_systems_operational": "Tous les Systèmes Opérationnels",
+    "last_checked": "Dernière vérification {time}",
+    "just_now": "à l'instant",
+    "minutes_ago": "il y a {count}m",
+    "hours_ago": "il y a {count}h",
+    "troubleshooting": "Dépannage",
+    "help_check_internet": "Vérifiez votre connexion Internet",
+    "help_check_server": "Assurez-vous que le serveur backend fonctionne sur localhost:5189",
+    "help_check_env": "Vérifiez API_BASE_URL et WS_BASE_URL dans le fichier .env"
+  }
+}

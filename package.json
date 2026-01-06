@@ -1,0 +1,25 @@
+{
+  "name": "mono_research",
+  "author": "Thomas Moerman",
+  "keywords": ["Flutter", "C#", "Research", "AI"],
+  "version": "0.0.1",
+  "description": "",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "lerna run dev --scope={research/app, research/backend} --stream --parallel"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thomasmoerman2/mono_research.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thomasmoerman2/mono_research/issues"
+  },
+  "homepage": "https://github.com/thomasmoerman2/mono_research#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "lerna": "^9.0.3"
+  }
+}

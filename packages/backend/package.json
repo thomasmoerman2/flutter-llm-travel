@@ -1,0 +1,7 @@
+{
+    "name": "@research/backend",
+    "scripts": {
+        "dev": "dotnet restore && dotnet run",
+        "build": "dotnet build"
+    }
+}

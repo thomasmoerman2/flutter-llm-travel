@@ -1,0 +1,64 @@
+{
+  "home": {
+    "title": "How can I help you with travel?",
+    "subtitle": "Tell me where you would like to travel and how you would like to do things.",
+    "input_placeholder": "I would like to travel to..."
+  },
+  "settings": {
+    "title": "Settings",
+    "back": "Back",
+    "account_section": "Account",
+    "password_changed": "Password • Changed {days} days ago",
+    "account_created": "Account • Created {days} days ago",
+    "apple_intelligence_requirement": "Apple Intelligence is only available on iOS devices with iOS 18.0 or higher",
+    "connection_status": "Connection Status",
+    "language": "Language",
+    "ai_section": "Artificial Intelligence",
+    "model": "Standard Model",
+    "connect": "Connect or create an account",
+    "disconnect": "Disconnect"
+  },
+  "navigation": {
+    "chat": "Chat",
+    "map": "Map",
+    "settings": "Settings",
+    "menu": "Menu"
+  },
+  "languages": {
+    "nl": "Dutch",
+    "en": "English",
+    "fr": "French"
+  },
+  "models": {
+    "on_device": "on-device",
+    "chatgpt": "ChatGPT",
+    "gemini": "Gemini",
+    "hybrid": "Hybrid"
+  },
+  "model_description": {
+    "chatgpt": "Uses OpenAI's ChatGPT for advanced AI responses. Internet connection required.",
+    "gemini": "Uses Google's Gemini AI for comprehensive support. Internet connection required.",
+    "hybrid": "Combines local and cloud processing for optimal performance and privacy.",
+    "apple_intelligence": "Processing happens on your device. Completely private and works offline. Uses Apple's on-device intelligence for private and secure AI processing. Only available on iOS 18.0+."
+  },
+  "connection_status": {
+    "title": "Connection Status",
+    "api_connection": "API Connection",
+    "websocket_connection": "WebSocket Connection",
+    "status": "Status",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "error": "Error",
+    "checking": "Checking...",
+    "issues_detected": "Issues Detected",
+    "all_systems_operational": "All Systems Operational",
+    "last_checked": "Last checked {time}",
+    "just_now": "just now",
+    "minutes_ago": "{count}m ago",
+    "hours_ago": "{count}h ago",
+    "troubleshooting": "Troubleshooting",
+    "help_check_internet": "Check your internet connection",
+    "help_check_server": "Ensure the backend server is running at localhost:5189",
+    "help_check_env": "Verify API_BASE_URL and WS_BASE_URL in .env file"
+  }
+}
