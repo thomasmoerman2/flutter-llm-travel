@@ -4,11 +4,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class EnvConfig {
   // API Configuration
   static String get apiBaseUrl =>
-      dotenv.env['API_BASE_URL'] ?? 'http://localhost:5189';
+      dotenv.env['API_BASE_URL'] ?? 'http://localhost:5005';
 
   // WebSocket Configuration
   static String get wsBaseUrl =>
-      dotenv.env['WS_BASE_URL'] ?? 'ws://localhost:5189';
+      dotenv.env['WS_BASE_URL'] ?? 'ws://localhost:5005';
 
   // Third-party Services
   static String get mapboxAccessToken =>

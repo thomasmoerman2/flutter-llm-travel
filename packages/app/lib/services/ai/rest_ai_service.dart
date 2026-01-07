@@ -22,22 +22,21 @@ class RestAIService implements AIService {
 
   /// Build REST API URL for the specific model
   String _buildApiUrl() {
-    // Convert ws://localhost:5189 to http://localhost:5189
-    final baseUrl = EnvConfig.wsBaseUrl.replaceFirst('ws://', 'http://');
+    final baseUrl = EnvConfig.apiBaseUrl;
     String endpoint;
 
     switch (model.toLowerCase()) {
       case 'chatgpt':
-        endpoint = '/api/ai/chatgpt';
+        endpoint = '/model/gpt';
         break;
       case 'gemini':
-        endpoint = '/api/ai/gemini';
+        endpoint = '/model/gemini';
         break;
       case 'hybrid':
-        endpoint = '/api/ai/hybrid';
+        endpoint = '/model/hybrid';
         break;
       default:
-        endpoint = '/api/ai/chatgpt'; // Default to ChatGPT
+        endpoint = '/model/gpt'; // Default to ChatGPT (GPT endpoint)
     }
 
     return '$baseUrl$endpoint';
@@ -126,12 +125,12 @@ Remember: Include ALL locations you mention with their REAL coordinates!
           ? basePrompt
           : '$basePrompt\n\nConversation history:\n$contextMessages';
 
-      // Prepare request body matching backend API
+      // Build complete message with system prompt and conversation history
+      final completeMessage = '$systemPrompt\n\n$message';
+
+      // Prepare request body matching NEW backend API format
       final requestBody = {
-        'prompt': message,
-        'model': null, // Let backend use default model for provider
-        'systemPrompt': systemPrompt,
-        'sessionId': _sessionId,
+        'message': completeMessage,
       };
 
       debugPrint('📤 Sending REST request to: $apiUrl');
@@ -141,7 +140,10 @@ Remember: Include ALL locations you mention with their REAL coordinates!
       final response = await http
           .post(
             Uri.parse(apiUrl),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
             body: jsonEncode(requestBody),
           )
           .timeout(
@@ -156,25 +158,64 @@ Remember: Include ALL locations you mention with their REAL coordinates!
           );
 
       final elapsed = DateTime.now().difference(startTime).inSeconds;
-      debugPrint('⏱️ Response received after ${elapsed}s');
+      debugPrint('⏱️ Response received after ${elapsed}s (status: ${response.statusCode})');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('📥 Response data keys: ${responseData.keys.join(", ")}');
 
         // Update metadata
         _lastMetadata = {
-          'provider': responseData['provider'],
-          'sessionId': responseData['sessionId'],
+          'model': model,
+          'provider': 'rest',
         };
 
-        // Update session ID from response
-        _sessionId = responseData['sessionId'] as String?;
+        // Extract response from NEW backend format
+        final responseText = responseData['response'];
 
-        final content = responseData['content'] as String? ?? '';
+        // Handle both string and object responses (Gemini might return object)
+        String content;
+        if (responseText is String) {
+          content = responseText;
+        } else if (responseText is Map) {
+          // For Gemini responses that might be objects, convert to JSON string
+          content = jsonEncode(responseText);
+        } else {
+          throw AIServiceException(
+            'Unexpected response format from server',
+            code: 'INVALID_RESPONSE',
+          );
+        }
+
         debugPrint('✅ Response complete (${content.length} chars)');
 
         // Yield the complete response at once
         yield content;
+      } else if (response.statusCode == 400) {
+        final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('❌ Bad request (400): ${errorData['error']}');
+        throw AIServiceException(
+          errorData['error'] ?? 'Bad request',
+          code: 'BAD_REQUEST',
+        );
+      } else if (response.statusCode == 500) {
+        debugPrint('❌ Server error (500): API key not configured');
+        throw AIServiceException(
+          'Server error: ${model.toUpperCase()} API key not configured',
+          code: 'SERVER_ERROR',
+        );
+      } else if (response.statusCode == 503) {
+        debugPrint('❌ Service unavailable (503)');
+        throw AIServiceException(
+          '${model.toUpperCase()} service is currently unavailable',
+          code: 'SERVICE_UNAVAILABLE',
+        );
+      } else if (response.statusCode == 504) {
+        debugPrint('❌ Gateway timeout (504)');
+        throw AIServiceException(
+          'Request to ${model.toUpperCase()} timed out',
+          code: 'GATEWAY_TIMEOUT',
+        );
       } else {
         debugPrint('❌ REST request failed with status ${response.statusCode}');
         debugPrint('Response body: ${response.body}');

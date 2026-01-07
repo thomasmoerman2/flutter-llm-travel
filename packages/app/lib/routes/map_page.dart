@@ -1662,7 +1662,6 @@ class MapPageContentState extends State<MapPageContent> {
                               stream: FirebaseFirestore.instance
                                   .collection('savedRoutes')
                                   .where('userId', isEqualTo: user.uid)
-                                  .orderBy('createdAt', descending: true)
                                   .snapshots(),
                               builder: (context, snapshot) {
                                 if (snapshot.connectionState ==
@@ -1673,13 +1672,28 @@ class MapPageContentState extends State<MapPageContent> {
                                 }
 
                                 if (snapshot.hasError) {
+                                  debugPrint('❌ Error loading routes: ${snapshot.error}');
                                   return Center(
-                                    child: Text(
-                                      'Error loading routes',
-                                      style: TextStyle(
-                                        color: ThemeColor.textSecondary,
-                                        fontSize: 14,
-                                      ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Error loading routes',
+                                          style: TextStyle(
+                                            color: ThemeColor.textSecondary,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '${snapshot.error}',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: ThemeColor.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   );
                                 }
