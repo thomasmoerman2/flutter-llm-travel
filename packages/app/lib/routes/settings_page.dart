@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/theme_color.dart';
 import '../services/auth_service.dart';
 import '../services/connection_health_service.dart';
+import '../services/offline_storage_service.dart';
 import '../services/preferences_service.dart';
 import 'connection_status_page.dart';
 import 'login_page.dart';
@@ -37,6 +38,13 @@ class _SettingsPageState extends State<SettingsPage> {
   ConnectionHealth? _wsHealth;
   bool _isCheckingConnections = false;
 
+  Map<String, dynamic> _offlineStats = {
+    'routesCount': 0,
+    'conversationsCount': 0,
+    'totalSizeKB': '0',
+  };
+  bool _isLoadingOfflineStats = false;
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +53,55 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadUserData();
     _checkConnections();
     _loadSelectedModel();
+    _loadOfflineStats();
+  }
+
+  Future<void> _loadOfflineStats() async {
+    debugPrint('📊 [SETTINGS] Loading offline stats...');
+    setState(() {
+      _isLoadingOfflineStats = true;
+    });
+
+    final stats = await OfflineStorageService.getStorageStats();
+    debugPrint('📊 [SETTINGS] Received stats: $stats');
+
+    if (mounted) {
+      setState(() {
+        _offlineStats = stats;
+        _isLoadingOfflineStats = false;
+      });
+      debugPrint('📊 [SETTINGS] Stats updated in UI');
+    }
+  }
+
+  Future<void> _clearOfflineData() async {
+    final shouldClear = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Clear Offline Data'),
+        content: const Text(
+          'This will remove all saved routes and conversations from offline storage. You can re-download them when online.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('Clear'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true) {
+      await OfflineStorageService.clearAllOfflineData();
+      await _loadOfflineStats();
+      if (!mounted) return;
+      _showSuccess('Offline data cleared successfully');
+    }
   }
 
   Future<void> _loadSelectedModel() async {
@@ -514,8 +571,131 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ],
-
                     const SizedBox(height: 60),
+                    if (widget.isLoggedIn) ...[
+                      Text(
+                        'Offline Storage',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: ThemeColor.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Storage Stats Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: ThemeColor.surface,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: _isLoadingOfflineStats
+                            ? const Center(child: CupertinoActivityIndicator())
+                            : Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: ThemeColor.primary.withOpacity(
+                                            0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          LucideIcons.hardDrive,
+                                          size: 20,
+                                          color: ThemeColor.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Text(
+                                          'Data available offline',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: ThemeColor.textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: _loadOfflineStats,
+                                        child: const Icon(
+                                          LucideIcons.refreshCw,
+                                          size: 18,
+                                          color: ThemeColor.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _OfflineStatRow(
+                                    icon: LucideIcons.route,
+                                    label: 'Saved Routes',
+                                    value: _offlineStats['routesCount']
+                                        .toString(),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _OfflineStatRow(
+                                    icon: LucideIcons.messageSquare,
+                                    label: 'Conversations',
+                                    value: _offlineStats['conversationsCount']
+                                        .toString(),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _OfflineStatRow(
+                                    icon: LucideIcons.database,
+                                    label: 'Storage Used',
+                                    value: '${_offlineStats['totalSizeKB']} KB',
+                                  ),
+                                  const SizedBox(height: 16),
+                                  GestureDetector(
+                                    onTap: _clearOfflineData,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFFFF3B30,
+                                        ).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            LucideIcons.trash2,
+                                            size: 16,
+                                            color: Color(0xFFFF3B30),
+                                          ),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Clear Offline Data',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFFFF3B30),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+
+                      const SizedBox(height: 32),
+                      _SectionDivider(),
+                      const SizedBox(height: 32),
+                    ],
                   ],
                 ),
               ),
@@ -692,6 +872,45 @@ class _SectionDivider extends StatelessWidget {
     return Container(
       height: 1,
       color: ThemeColor.textSecondary.withOpacity(0.1),
+    );
+  }
+}
+
+class _OfflineStatRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _OfflineStatRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: ThemeColor.textSecondary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: ThemeColor.textSecondary,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: ThemeColor.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }

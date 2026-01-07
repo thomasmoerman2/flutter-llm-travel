@@ -6,6 +6,7 @@ import 'ai/ai_service.dart';
 import 'ai/ai_service_factory.dart';
 import 'firestore_access.dart';
 import 'location_parser.dart';
+import 'offline_storage_service.dart';
 
 /// Service to manage chat conversations and AI interactions
 class ChatService {
@@ -286,18 +287,39 @@ class ChatService {
     final messages = await _firestore
         .getMessages(_currentConversationId!)
         .first;
+    final title = messages.isNotEmpty
+        ? _generateTitle(messages.first.content)
+        : 'New Conversation';
+    final now = DateTime.now();
+
     final conversation = Conversation(
       id: _currentConversationId!,
       userId: user.uid,
-      title: messages.isNotEmpty
-          ? _generateTitle(messages.first.content)
-          : 'New Conversation',
+      title: title,
       currentModel: _currentModel!,
-      createdAt: DateTime.now(), // Would need to fetch actual creation time
-      updatedAt: DateTime.now(),
+      createdAt: now, // Would need to fetch actual creation time
+      updatedAt: now,
       messageCount: messages.length,
     );
+
+    // Update Firestore
     await _firestore.updateConversation(conversation);
+
+    // Also save to offline storage
+    await OfflineStorageService.saveConversation(
+      id: _currentConversationId!,
+      userId: user.uid,
+      title: title,
+      currentModel: _currentModel!,
+      messageCount: messages.length,
+      updatedAt: now,
+    );
+
+    // Save messages to offline storage
+    await OfflineStorageService.saveConversationMessages(
+      conversationId: _currentConversationId!,
+      messages: messages,
+    );
   }
 
   /// Generate conversation title from first message

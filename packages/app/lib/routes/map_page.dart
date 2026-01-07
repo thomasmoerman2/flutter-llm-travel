@@ -10,6 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../services/env_config.dart';
 import '../services/mapbox_directions_service.dart';
+import '../services/offline_storage_service.dart';
 import '../services/theme_color.dart';
 import '../services/mapbox_search_service.dart';
 
@@ -1565,6 +1566,7 @@ class MapPageContentState extends State<MapPageContent> {
         return;
       }
 
+      final now = DateTime.now();
       final routeData = {
         'userId': user.uid,
         'name': name,
@@ -1575,9 +1577,24 @@ class MapPageContentState extends State<MapPageContent> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance.collection('savedRoutes').add(routeData);
+      // Save to Firestore
+      final docRef = await FirebaseFirestore.instance
+          .collection('savedRoutes')
+          .add(routeData);
 
-      debugPrint('✅ Route saved successfully');
+      debugPrint('✅ Route saved to Firestore successfully');
+
+      // Also save to offline storage for offline access
+      await OfflineStorageService.saveRoute(
+        id: docRef.id,
+        name: name,
+        locations: locations.map((loc) => loc.toJson()).toList(),
+        routeType: routeType?.name,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      debugPrint('✅ Route also saved to offline storage');
     } catch (e) {
       debugPrint('❌ Error saving route: $e');
       if (!mounted) return;
