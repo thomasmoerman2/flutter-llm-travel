@@ -50,9 +50,37 @@ public static class MyGroups
                 Log.Debug("Creating OpenAI client");
                 var client = new OpenAIClient(apiKey);
 
+                var systemPrompt = @"You are a travel planning assistant. When users ask for travel recommendations, places, routes, or itineraries:
+
+1. Provide a helpful summary or explanation in natural language.
+2. Include a JSON code block with location data in this format:
+
+```json
+{
+  ""locations"": [
+    {
+      ""name"": ""Location Name"",
+      ""lat"": 12.3456,
+      ""lng"": -98.7654,
+      ""description"": ""Brief description"",
+      ""day"": 1
+    }
+  ],
+  ""route"": {
+    ""type"": ""driving""
+  }
+}
+```
+
+Required fields: name, lat, lng
+Optional fields: description, day (for multi-day itineraries)
+Route types: driving, walking, cycling (include route only if the user asks for directions or a route)
+
+Always provide accurate coordinates. If the user's request is not travel-related, respond normally without JSON.";
+
                 var messages = new List<ChatMessage>
                 {
-                    new SystemChatMessage("You are a helpful assistant."),
+                    new SystemChatMessage(systemPrompt),
                     new UserChatMessage(message)
                 };
 
@@ -121,10 +149,40 @@ public static class MyGroups
                 Log.Debug("Creating Gemini client");
                 var client = new Client(apiKey: apiKey);
 
+                var systemPrompt = @"You are a travel planning assistant. When users ask for travel recommendations, places, routes, or itineraries:
+
+1. Provide a helpful summary or explanation in natural language.
+2. Include a JSON code block with location data in this format:
+
+```json
+{
+  ""locations"": [
+    {
+      ""name"": ""Location Name"",
+      ""lat"": 12.3456,
+      ""lng"": -98.7654,
+      ""description"": ""Brief description"",
+      ""day"": 1
+    }
+  ],
+  ""route"": {
+    ""type"": ""driving""
+  }
+}
+```
+
+Required fields: name, lat, lng
+Optional fields: description, day (for multi-day itineraries)
+Route types: driving, walking, cycling (include route only if the user asks for directions or a route)
+
+Always provide accurate coordinates. If the user's request is not travel-related, respond normally without JSON.";
+
+                var fullPrompt = $"{systemPrompt}\n\nUser request: {message}";
+
                 Log.Information("Sending request to Gemini API");
                 var response = await client.Models.GenerateContentAsync(
                     model: "gemini-2.5-flash",
-                    contents: message
+                    contents: fullPrompt
                 );
 
                 Log.Information("Successfully received response from Gemini API");
