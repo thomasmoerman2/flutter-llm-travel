@@ -1,6 +1,6 @@
 # Offline behavior
 
-This document explains what “offline” means in the current app, what data is stored locally, and the current limitations.
+This document explains what “offline” means in the current app, what data is stored locally, and the current limitations. It reflects the current implementation only.
 
 ## Scope
 
