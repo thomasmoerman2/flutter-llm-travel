@@ -2,8 +2,8 @@ namespace backend.Services;
 public class FirebaseAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     public FirebaseAuthenticationHandler(IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory logger, UrlEncoder encoder, ISystemClock clock)
-        : base(options, logger, encoder, clock)
+        ILoggerFactory logger, UrlEncoder encoder)
+        : base(options, logger, encoder)
     {
     }
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
