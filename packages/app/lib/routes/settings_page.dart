@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../models/chat_message.dart';
 import '../services/theme_color.dart';
 import '../services/auth_service.dart';
 import '../services/connection_health_service.dart';
+import '../services/firestore_access.dart';
 import '../services/offline_storage_service.dart';
 import '../services/preferences_service.dart';
 import 'connection_status_page.dart';
@@ -44,6 +47,7 @@ class _SettingsPageState extends State<SettingsPage> {
     'totalSizeKB': '0',
   };
   bool _isLoadingOfflineStats = false;
+  bool _isDownloadingData = false;
 
   @override
   void initState() {
@@ -101,6 +105,110 @@ class _SettingsPageState extends State<SettingsPage> {
       await _loadOfflineStats();
       if (!mounted) return;
       _showSuccess('Offline data cleared successfully');
+    }
+  }
+
+  Future<void> _downloadAllData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showError('You must be logged in to download data');
+      return;
+    }
+
+    setState(() {
+      _isDownloadingData = true;
+    });
+
+    int routesDownloaded = 0;
+    int conversationsDownloaded = 0;
+
+    try {
+      debugPrint('📥 Starting offline data download...');
+
+      // Download all saved routes
+      debugPrint('📥 Fetching routes from Firestore...');
+      final routesSnapshot = await FirebaseFirestore.instance
+          .collection('savedRoutes')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+
+      debugPrint('📥 Found ${routesSnapshot.docs.length} routes');
+
+      for (final doc in routesSnapshot.docs) {
+        final data = doc.data();
+        final locations = (data['locations'] as List?)
+            ?.map((loc) => loc as Map<String, dynamic>)
+            .toList() ?? [];
+
+        await OfflineStorageService.saveRoute(
+          id: doc.id,
+          name: data['name'] as String? ?? 'Unnamed Route',
+          locations: locations,
+          routeType: data['routeType'] as String?,
+          createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
+        routesDownloaded++;
+      }
+
+      debugPrint('✅ Downloaded $routesDownloaded routes');
+
+      // Download all conversations
+      debugPrint('📥 Fetching conversations from Firestore...');
+      final firestoreAccess = FirestoreAccess();
+      final conversations = await firestoreAccess.getConversations(user.uid).first;
+
+      debugPrint('📥 Found ${conversations.length} conversations');
+
+      // Limit to 10 most recent conversations
+      final conversationsToDownload = conversations.take(10).toList();
+
+      for (final conversation in conversationsToDownload) {
+        // Save conversation
+        await OfflineStorageService.saveConversation(
+          id: conversation.id,
+          userId: user.uid,
+          title: conversation.title,
+          currentModel: conversation.currentModel,
+          messageCount: conversation.messageCount,
+          updatedAt: conversation.updatedAt,
+        );
+
+        // Download messages for this conversation
+        final messages = await firestoreAccess.getMessages(conversation.id).first;
+
+        await OfflineStorageService.saveConversationMessages(
+          conversationId: conversation.id,
+          messages: messages,
+        );
+
+        conversationsDownloaded++;
+      }
+
+      debugPrint('✅ Downloaded $conversationsDownloaded conversations');
+
+      // Reload stats
+      await _loadOfflineStats();
+
+      if (!mounted) return;
+
+      setState(() {
+        _isDownloadingData = false;
+      });
+
+      _showSuccess(
+        'Downloaded $routesDownloaded routes and $conversationsDownloaded conversations',
+      );
+    } catch (e) {
+      debugPrint('❌ Error downloading data: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _isDownloadingData = false;
+      });
+
+      _showError('Failed to download data: ${e.toString()}');
     }
   }
 
@@ -654,6 +762,56 @@ class _SettingsPageState extends State<SettingsPage> {
                                     value: '${_offlineStats['totalSizeKB']} KB',
                                   ),
                                   const SizedBox(height: 16),
+                                  // Download All Data button
+                                  GestureDetector(
+                                    onTap: _isDownloadingData ? null : _downloadAllData,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: ThemeColor.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: _isDownloadingData
+                                          ? const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                CupertinoActivityIndicator(radius: 10),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'Downloading...',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: ThemeColor.primary,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  LucideIcons.download,
+                                                  size: 16,
+                                                  color: ThemeColor.primary,
+                                                ),
+                                                SizedBox(width: 6),
+                                                Text(
+                                                  'Download All Data',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: ThemeColor.primary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // Clear button
                                   GestureDetector(
                                     onTap: _clearOfflineData,
                                     child: Container(
