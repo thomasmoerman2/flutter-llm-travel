@@ -10,6 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../services/env_config.dart';
 import '../services/mapbox_directions_service.dart';
+import '../services/offline_storage_service.dart';
 import '../services/theme_color.dart';
 import '../services/mapbox_search_service.dart';
 
@@ -776,9 +777,15 @@ class MapPageContentState extends State<MapPageContent> {
       );
     }
 
-    return Stack(
-      children: [
-        Focus(canRequestFocus: false, skipTraversal: true, child: _mapWidget),
+    // Get keyboard height to adjust UI when keyboard is visible
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      child: Stack(
+        children: [
+          Focus(canRequestFocus: false, skipTraversal: true, child: _mapWidget),
 
         // Local suggestions list
         if (!_showResults &&
@@ -788,7 +795,7 @@ class MapPageContentState extends State<MapPageContent> {
             key: const ValueKey('map_suggestions'),
             left: 16,
             right: 16,
-            bottom: widget.bottomInset + 80,
+            bottom: widget.bottomInset + 80 + keyboardHeight,
             child: _buildSuggestionsList(),
           ),
 
@@ -798,7 +805,7 @@ class MapPageContentState extends State<MapPageContent> {
             key: const ValueKey('map_results'),
             left: 16,
             right: 16,
-            bottom: widget.bottomInset + 80,
+            bottom: widget.bottomInset + 80 + keyboardHeight,
             child: Container(
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.of(context).size.height * 0.5,
@@ -944,7 +951,7 @@ class MapPageContentState extends State<MapPageContent> {
           key: const ValueKey('map_search_bar'),
           left: 16,
           right: 16,
-          bottom: widget.bottomInset,
+          bottom: widget.bottomInset + keyboardHeight,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1031,7 +1038,8 @@ class MapPageContentState extends State<MapPageContent> {
             ),
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1565,6 +1573,7 @@ class MapPageContentState extends State<MapPageContent> {
         return;
       }
 
+      final now = DateTime.now();
       final routeData = {
         'userId': user.uid,
         'name': name,
@@ -1575,9 +1584,24 @@ class MapPageContentState extends State<MapPageContent> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance.collection('savedRoutes').add(routeData);
+      // Save to Firestore
+      final docRef = await FirebaseFirestore.instance
+          .collection('savedRoutes')
+          .add(routeData);
 
-      debugPrint('✅ Route saved successfully');
+      debugPrint('✅ Route saved to Firestore successfully');
+
+      // Also save to offline storage for offline access
+      await OfflineStorageService.saveRoute(
+        id: docRef.id,
+        name: name,
+        locations: locations.map((loc) => loc.toJson()).toList(),
+        routeType: routeType?.name,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      debugPrint('✅ Route also saved to offline storage');
     } catch (e) {
       debugPrint('❌ Error saving route: $e');
       if (!mounted) return;

@@ -1,11 +1,15 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../models/chat_message.dart';
 import '../services/theme_color.dart';
 import '../services/auth_service.dart';
 import '../services/connection_health_service.dart';
+import '../services/firestore_access.dart';
+import '../services/offline_storage_service.dart';
 import '../services/preferences_service.dart';
 import 'connection_status_page.dart';
 import 'login_page.dart';
@@ -37,6 +41,14 @@ class _SettingsPageState extends State<SettingsPage> {
   ConnectionHealth? _wsHealth;
   bool _isCheckingConnections = false;
 
+  Map<String, dynamic> _offlineStats = {
+    'routesCount': 0,
+    'conversationsCount': 0,
+    'totalSizeKB': '0',
+  };
+  bool _isLoadingOfflineStats = false;
+  bool _isDownloadingData = false;
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +57,159 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadUserData();
     _checkConnections();
     _loadSelectedModel();
+    _loadOfflineStats();
+  }
+
+  Future<void> _loadOfflineStats() async {
+    debugPrint('📊 [SETTINGS] Loading offline stats...');
+    setState(() {
+      _isLoadingOfflineStats = true;
+    });
+
+    final stats = await OfflineStorageService.getStorageStats();
+    debugPrint('📊 [SETTINGS] Received stats: $stats');
+
+    if (mounted) {
+      setState(() {
+        _offlineStats = stats;
+        _isLoadingOfflineStats = false;
+      });
+      debugPrint('📊 [SETTINGS] Stats updated in UI');
+    }
+  }
+
+  Future<void> _clearOfflineData() async {
+    final shouldClear = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Clear Offline Data'),
+        content: const Text(
+          'This will remove all saved routes and conversations from offline storage. You can re-download them when online.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('Clear'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldClear == true) {
+      await OfflineStorageService.clearAllOfflineData();
+      await _loadOfflineStats();
+      if (!mounted) return;
+      _showSuccess('Offline data cleared successfully');
+    }
+  }
+
+  Future<void> _downloadAllData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showError('You must be logged in to download data');
+      return;
+    }
+
+    setState(() {
+      _isDownloadingData = true;
+    });
+
+    int routesDownloaded = 0;
+    int conversationsDownloaded = 0;
+
+    try {
+      debugPrint('📥 Starting offline data download...');
+
+      // Download all saved routes
+      debugPrint('📥 Fetching routes from Firestore...');
+      final routesSnapshot = await FirebaseFirestore.instance
+          .collection('savedRoutes')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+
+      debugPrint('📥 Found ${routesSnapshot.docs.length} routes');
+
+      for (final doc in routesSnapshot.docs) {
+        final data = doc.data();
+        final locations = (data['locations'] as List?)
+            ?.map((loc) => loc as Map<String, dynamic>)
+            .toList() ?? [];
+
+        await OfflineStorageService.saveRoute(
+          id: doc.id,
+          name: data['name'] as String? ?? 'Unnamed Route',
+          locations: locations,
+          routeType: data['routeType'] as String?,
+          createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
+        routesDownloaded++;
+      }
+
+      debugPrint('✅ Downloaded $routesDownloaded routes');
+
+      // Download all conversations
+      debugPrint('📥 Fetching conversations from Firestore...');
+      final firestoreAccess = FirestoreAccess();
+      final conversations = await firestoreAccess.getConversations(user.uid).first;
+
+      debugPrint('📥 Found ${conversations.length} conversations');
+
+      // Limit to 10 most recent conversations
+      final conversationsToDownload = conversations.take(10).toList();
+
+      for (final conversation in conversationsToDownload) {
+        // Save conversation
+        await OfflineStorageService.saveConversation(
+          id: conversation.id,
+          userId: user.uid,
+          title: conversation.title,
+          currentModel: conversation.currentModel,
+          messageCount: conversation.messageCount,
+          updatedAt: conversation.updatedAt,
+        );
+
+        // Download messages for this conversation
+        final messages = await firestoreAccess.getMessages(conversation.id).first;
+
+        await OfflineStorageService.saveConversationMessages(
+          conversationId: conversation.id,
+          messages: messages,
+        );
+
+        conversationsDownloaded++;
+      }
+
+      debugPrint('✅ Downloaded $conversationsDownloaded conversations');
+
+      // Reload stats
+      await _loadOfflineStats();
+
+      if (!mounted) return;
+
+      setState(() {
+        _isDownloadingData = false;
+      });
+
+      _showSuccess(
+        'Downloaded $routesDownloaded routes and $conversationsDownloaded conversations',
+      );
+    } catch (e) {
+      debugPrint('❌ Error downloading data: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _isDownloadingData = false;
+      });
+
+      _showError('Failed to download data: ${e.toString()}');
+    }
   }
 
   Future<void> _loadSelectedModel() async {
@@ -514,8 +679,181 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ],
-
                     const SizedBox(height: 60),
+                    if (widget.isLoggedIn) ...[
+                      Text(
+                        'Offline Storage',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: ThemeColor.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Storage Stats Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: ThemeColor.surface,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: _isLoadingOfflineStats
+                            ? const Center(child: CupertinoActivityIndicator())
+                            : Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: ThemeColor.primary.withOpacity(
+                                            0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          LucideIcons.hardDrive,
+                                          size: 20,
+                                          color: ThemeColor.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Text(
+                                          'Data available offline',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: ThemeColor.textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: _loadOfflineStats,
+                                        child: const Icon(
+                                          LucideIcons.refreshCw,
+                                          size: 18,
+                                          color: ThemeColor.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _OfflineStatRow(
+                                    icon: LucideIcons.route,
+                                    label: 'Saved Routes',
+                                    value: _offlineStats['routesCount']
+                                        .toString(),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _OfflineStatRow(
+                                    icon: LucideIcons.messageSquare,
+                                    label: 'Conversations',
+                                    value: _offlineStats['conversationsCount']
+                                        .toString(),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _OfflineStatRow(
+                                    icon: LucideIcons.database,
+                                    label: 'Storage Used',
+                                    value: '${_offlineStats['totalSizeKB']} KB',
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Download All Data button
+                                  GestureDetector(
+                                    onTap: _isDownloadingData ? null : _downloadAllData,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: ThemeColor.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: _isDownloadingData
+                                          ? const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                CupertinoActivityIndicator(radius: 10),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'Downloading...',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: ThemeColor.primary,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  LucideIcons.download,
+                                                  size: 16,
+                                                  color: ThemeColor.primary,
+                                                ),
+                                                SizedBox(width: 6),
+                                                Text(
+                                                  'Download All Data',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: ThemeColor.primary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // Clear button
+                                  GestureDetector(
+                                    onTap: _clearOfflineData,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFFFF3B30,
+                                        ).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            LucideIcons.trash2,
+                                            size: 16,
+                                            color: Color(0xFFFF3B30),
+                                          ),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Clear Offline Data',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFFFF3B30),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+
+                      const SizedBox(height: 32),
+                      _SectionDivider(),
+                      const SizedBox(height: 32),
+                    ],
                   ],
                 ),
               ),
@@ -692,6 +1030,45 @@ class _SectionDivider extends StatelessWidget {
     return Container(
       height: 1,
       color: ThemeColor.textSecondary.withOpacity(0.1),
+    );
+  }
+}
+
+class _OfflineStatRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _OfflineStatRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: ThemeColor.textSecondary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: ThemeColor.textSecondary,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: ThemeColor.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }
