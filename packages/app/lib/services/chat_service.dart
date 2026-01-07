@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import 'ai/ai_service.dart';
 import 'ai/ai_service_factory.dart';
 import 'firestore_access.dart';
+import 'location_parser.dart';
 
 /// Service to manage chat conversations and AI interactions
 class ChatService {
@@ -17,7 +19,10 @@ class ChatService {
   Stream<ChatMessage> get messageStream => _messageStreamController.stream;
 
   /// Initialize or switch to a conversation
-  Future<String> initializeConversation(String model, {String? conversationId}) async {
+  Future<String> initializeConversation(
+    String model, {
+    String? conversationId,
+  }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('User must be logged in to chat');
@@ -38,12 +43,17 @@ class ChatService {
         updatedAt: DateTime.now(),
         messageCount: 0,
       );
-      _currentConversationId = await _firestore.createConversation(conversation);
+      _currentConversationId = await _firestore.createConversation(
+        conversation,
+      );
     }
 
     // NOW switch AI service if model changed (with conversationId available)
-    final conversationChanged = previousConversationId != _currentConversationId;
-    if (_currentAIService == null || _currentModel != model || conversationChanged) {
+    final conversationChanged =
+        previousConversationId != _currentConversationId;
+    if (_currentAIService == null ||
+        _currentModel != model ||
+        conversationChanged) {
       await _switchModel(model);
     }
 
@@ -75,11 +85,15 @@ class ChatService {
         updatedAt: DateTime.now(),
         messageCount: 0,
       );
-      _currentConversationId = await _firestore.createConversation(conversation);
+      _currentConversationId = await _firestore.createConversation(
+        conversation,
+      );
       createdConversation = true;
     }
 
-    if (_currentAIService == null || _currentModel != model || createdConversation) {
+    if (_currentAIService == null ||
+        _currentModel != model ||
+        createdConversation) {
       await _switchModel(model);
     }
 
@@ -108,6 +122,11 @@ class ChatService {
     if (user == null) {
       throw Exception('User must be logged in');
     }
+
+    String? aiMessageId;
+    ChatMessage? aiMessage;
+    String fullResponse = '';
+    bool responseCompleted = false;
 
     try {
       // Create user message
@@ -140,7 +159,7 @@ class ChatService {
           .timeout(const Duration(seconds: 5));
 
       // Create placeholder for AI response
-      final aiMessage = ChatMessage(
+      aiMessage = ChatMessage(
         id: '',
         conversationId: _currentConversationId!,
         userId: user.uid,
@@ -153,8 +172,7 @@ class ChatService {
       );
 
       // Save placeholder to Firestore
-      final aiMessageId = await _firestore.addMessage(aiMessage);
-      String fullResponse = '';
+      aiMessageId = await _firestore.addMessage(aiMessage);
 
       // Stream AI response
       await for (final chunk in _currentAIService!.sendMessage(
@@ -174,14 +192,42 @@ class ChatService {
         _messageStreamController.add(updatedMessage);
       }
 
-      // Mark as complete
+      final parsed = LocationParser.parseLocationsAndRoute(fullResponse);
+      debugPrint('🗺️ Parsed locations: ${parsed.locations.length} found');
+      if (parsed.locations.isNotEmpty) {
+        debugPrint('📍 Location details: ${parsed.locations.map((l) => l.name).join(", ")}');
+      }
+      if (parsed.routeType != null) {
+        debugPrint('🛣️ Route type: ${parsed.routeType!.name}');
+      }
+
+      final cleanedText = parsed.cleanedText.trim();
+      final finalContent = cleanedText.isNotEmpty
+          ? cleanedText
+          : fullResponse.trim();
+
+      final responseMetadata = Map<String, dynamic>.from(
+        _currentAIService!.getResponseMetadata(),
+      );
+      if (parsed.locations.isNotEmpty) {
+        responseMetadata['locations'] =
+            parsed.locations.map((location) => location.toJson()).toList();
+        debugPrint('✅ Added locations to metadata');
+      }
+      if (parsed.routeType != null) {
+        responseMetadata['routeType'] = parsed.routeType!.name;
+        debugPrint('✅ Added routeType to metadata');
+      }
+
       final finalMessage = aiMessage.copyWith(
         id: aiMessageId,
-        content: fullResponse,
+        content: finalContent,
         status: MessageStatus.sent,
+        metadata: responseMetadata.isEmpty ? null : responseMetadata,
       );
       await _firestore.updateMessage(finalMessage);
       _messageStreamController.add(finalMessage);
+      responseCompleted = true;
 
       // Update conversation
       await _updateConversation();
@@ -190,27 +236,42 @@ class ChatService {
       String errorContent;
       if (e is AIServiceException && e.code == 'TIMEOUT') {
         // Custom timeout message
-        errorContent = '⏱️ The AI took too long to respond (timeout after 60 seconds). Please try again with a simpler question, or check your internet connection.';
+        errorContent =
+            '⏱️ The AI took too long to respond (timeout after 60 seconds). Please try again with a simpler question, or check your internet connection.';
       } else if (e is AIServiceException && e.code == 'CONNECTION_ERROR') {
-        errorContent = '🔌 Connection error. Please check if the backend server is running and try again.';
+        errorContent =
+            '🔌 Connection error. Please check if the backend server is running and try again.';
       } else if (e is AIServiceException && e.code == 'SERVER_ERROR') {
         errorContent = '⚠️ Server error: ${e.message}';
       } else {
         errorContent = '❌ Error: ${e.toString()}';
       }
 
-      final errorMessage = ChatMessage(
-        id: '',
-        conversationId: _currentConversationId!,
-        userId: user.uid,
-        content: errorContent,
-        role: MessageRole.assistant,
-        status: MessageStatus.error,
-        model: _currentModel!,
-        timestamp: DateTime.now(),
-      );
-      final errorId = await _firestore.addMessage(errorMessage);
-      _messageStreamController.add(errorMessage.copyWith(id: errorId));
+      if (!responseCompleted && aiMessageId != null && aiMessage != null) {
+        final failureContent = fullResponse.trim().isNotEmpty
+            ? '${fullResponse.trim()}\n\n$errorContent'
+            : errorContent;
+        final errorMessage = aiMessage.copyWith(
+          id: aiMessageId,
+          content: failureContent,
+          status: MessageStatus.error,
+        );
+        await _firestore.updateMessage(errorMessage);
+        _messageStreamController.add(errorMessage);
+      } else if (!responseCompleted) {
+        final errorMessage = ChatMessage(
+          id: '',
+          conversationId: _currentConversationId!,
+          userId: user.uid,
+          content: errorContent,
+          role: MessageRole.assistant,
+          status: MessageStatus.error,
+          model: _currentModel!,
+          timestamp: DateTime.now(),
+        );
+        final errorId = await _firestore.addMessage(errorMessage);
+        _messageStreamController.add(errorMessage.copyWith(id: errorId));
+      }
       rethrow;
     }
   }
@@ -222,11 +283,15 @@ class ChatService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final messages = await _firestore.getMessages(_currentConversationId!).first;
+    final messages = await _firestore
+        .getMessages(_currentConversationId!)
+        .first;
     final conversation = Conversation(
       id: _currentConversationId!,
       userId: user.uid,
-      title: messages.isNotEmpty ? _generateTitle(messages.first.content) : 'New Conversation',
+      title: messages.isNotEmpty
+          ? _generateTitle(messages.first.content)
+          : 'New Conversation',
       currentModel: _currentModel!,
       createdAt: DateTime.now(), // Would need to fetch actual creation time
       updatedAt: DateTime.now(),

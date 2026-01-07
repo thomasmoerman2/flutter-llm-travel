@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:app/routes/login_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,20 +9,24 @@ import '../services/chat_service.dart';
 import '../services/firestore_access.dart';
 import '../services/preferences_service.dart';
 import '../services/theme_color.dart';
+import '../services/mapbox_directions_service.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// Content-only widget for the home page (without navigation)
 /// Used inside RootLayout
 class HomePageContent extends StatefulWidget {
   final String? initialModel;
+  final void Function(List<LocationData> locations, RouteType? routeType)?
+      onShowOnMap;
 
-  const HomePageContent({super.key, this.initialModel});
+  const HomePageContent({super.key, this.initialModel, this.onShowOnMap});
 
   @override
   State<HomePageContent> createState() => HomePageContentState();
 }
 
-class HomePageContentState extends State<HomePageContent> with WidgetsBindingObserver {
+class HomePageContentState extends State<HomePageContent>
+    with WidgetsBindingObserver {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ChatService _chatService = ChatService();
@@ -33,6 +38,7 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
   List<ChatMessage> _messages = [];
   bool _isInitialized = false;
   bool _isSending = false;
+  DateTime? _lastScrollTime;
 
   String? get currentConversationId => _conversationId;
 
@@ -75,7 +81,9 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
         } else {
           // If conversation not initialized yet, just update the model
           // It will use the new model when initialized
-          debugPrint('💡 Conversation not initialized yet, will use $newModel on next message');
+          debugPrint(
+            '💡 Conversation not initialized yet, will use $newModel on next message',
+          );
         }
       } catch (e) {
         debugPrint('⚠️ Error switching model: $e');
@@ -138,6 +146,14 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
   }
 
   void _scrollToBottom() {
+    // Throttle scroll animations to prevent flickering during streaming
+    final now = DateTime.now();
+    if (_lastScrollTime != null &&
+        now.difference(_lastScrollTime!) < const Duration(milliseconds: 500)) {
+      return; // Skip if we scrolled recently
+    }
+    _lastScrollTime = now;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -151,42 +167,59 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
 
   void _subscribeToConversation(String conversationId) {
     _messagesSubscription?.cancel();
-    _messagesSubscription = _firestore.getMessages(conversationId).listen(
-      (messages) {
-        debugPrint('📨 Received ${messages.length} messages from Firestore');
-        if (mounted) {
-          setState(() {
-            _messages = messages;
-          });
-          _scrollToBottom();
-        }
-      },
-      onError: (error) {
-        debugPrint('⚠️ Firestore listener error: $error');
-        // If index missing, show helpful message
-        if (error.toString().contains('requires an index')) {
-          debugPrint('💡 Please create the Firestore index using: firebase deploy --only firestore:indexes');
-        }
-        // Continue without Firestore - WebSocket will still work
-      },
-    );
+    _messagesSubscription = _firestore
+        .getMessages(conversationId)
+        .listen(
+          (messages) {
+            debugPrint(
+              '📨 Received ${messages.length} messages from Firestore',
+            );
+            if (mounted) {
+              // Check if we should update (avoid rebuilds during rapid streaming)
+              final shouldUpdate =
+                  _messages.isEmpty ||
+                  messages.length != _messages.length ||
+                  (messages.isNotEmpty &&
+                      _messages.isNotEmpty &&
+                      messages.last.content != _messages.last.content);
+
+              if (shouldUpdate) {
+                setState(() {
+                  _messages = messages;
+                });
+                _scrollToBottom();
+              }
+            }
+          },
+          onError: (error) {
+            debugPrint('⚠️ Firestore listener error: $error');
+            // If index missing, show helpful message
+            if (error.toString().contains('requires an index')) {
+              debugPrint(
+                '💡 Please create the Firestore index using: firebase deploy --only firestore:indexes',
+              );
+            }
+            // Continue without Firestore - WebSocket will still work
+          },
+        );
   }
 
-  Future<void> startNewConversation() async {
+  Future<bool> startNewConversation() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _promptLoginRequired();
-      return;
+      return false;
     }
 
     await _chatService.resetConversation();
     _messagesSubscription?.cancel();
-    if (!mounted) return;
+    if (!mounted) return false;
 
     setState(() {
       _conversationId = null;
       _messages = [];
     });
+    return true;
   }
 
   Future<void> openConversation(Conversation conversation) async {
@@ -234,7 +267,10 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
             onPressed: () {
               Navigator.pop(context);
               // Navigate to login page
-              Navigator.pushNamed(context, '/login');
+              Navigator.push(
+                context,
+                CupertinoPageRoute(builder: (context) => const LoginPage()),
+              );
             },
           ),
         ],
@@ -259,8 +295,9 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
         // Logged-in user: Use ChatService (saves to Firestore)
         debugPrint('💬 Sending message: $text');
         final hadNoConversation = _conversationId == null;
-        final conversationId =
-            await _chatService.ensureConversation(_currentModel);
+        final conversationId = await _chatService.ensureConversation(
+          _currentModel,
+        );
         if (!mounted) return;
         if (_conversationId != conversationId) {
           setState(() {
@@ -289,6 +326,14 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
     }
   }
 
+  Future<void> _resendMessage(String text) async {
+    if (_isSending) return;
+    _textController.text = text;
+    _textController.selection = TextSelection.fromPosition(
+      TextPosition(offset: text.length),
+    );
+    await _handleSend();
+  }
 
   void _showError(String message) {
     showCupertinoDialog(
@@ -304,6 +349,60 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
         ],
       ),
     );
+  }
+
+  void _handleShowOnMap(ChatMessage message) {
+    debugPrint('🗺️ _handleShowOnMap called');
+    final callback = widget.onShowOnMap;
+    if (callback == null) {
+      debugPrint('❌ No onShowOnMap callback provided');
+      return;
+    }
+
+    final locations = _extractLocations(message);
+    debugPrint('📍 Extracted ${locations.length} locations from message');
+    if (locations.isEmpty) {
+      debugPrint('❌ No locations found in message metadata');
+      _showError('No locations found for this response.');
+      return;
+    }
+
+    for (var i = 0; i < locations.length; i++) {
+      debugPrint('   Location $i: ${locations[i].name} (${locations[i].latitude}, ${locations[i].longitude})');
+    }
+
+    final routeType = _extractRouteType(message);
+    debugPrint('🛣️ Route type: ${routeType?.name ?? "none"}');
+    debugPrint('✅ Calling onShowOnMap callback');
+    callback(locations, routeType);
+  }
+
+  List<LocationData> _extractLocations(ChatMessage message) {
+    final locationsData = message.metadata?['locations'];
+    if (locationsData is! List) return [];
+
+    final locations = <LocationData>[];
+    for (final entry in locationsData) {
+      if (entry is Map<String, dynamic>) {
+        try {
+          locations.add(LocationData.fromJson(entry));
+        } catch (_) {}
+      }
+    }
+    return locations;
+  }
+
+  RouteType? _extractRouteType(ChatMessage message) {
+    final routeTypeValue = message.metadata?['routeType'];
+    if (routeTypeValue is String) {
+      final normalized = routeTypeValue.toLowerCase();
+      if (normalized.contains('walk')) return RouteType.walking;
+      if (normalized.contains('cycl') || normalized.contains('bike')) {
+        return RouteType.cycling;
+      }
+      if (normalized.contains('drive')) return RouteType.driving;
+    }
+    return null;
   }
 
   void _showSuccess(String message) {
@@ -334,9 +433,7 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const Center(
-        child: CupertinoActivityIndicator(),
-      );
+      return const Center(child: CupertinoActivityIndicator());
     }
 
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
@@ -356,73 +453,111 @@ class HomePageContentState extends State<HomePageContent> with WidgetsBindingObs
                     padding: const EdgeInsets.only(top: 16, bottom: 16),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
+                      final message = _messages[index];
                       return ChatMessageBubble(
-                        message: _messages[index],
-                        showModel: index == 0 ||
-                            _messages[index].model != _messages[index - 1].model,
+                        message: message,
+                        showModel:
+                            index == 0 ||
+                            message.model != _messages[index - 1].model,
+                        onShowOnMap: (!message.isUser &&
+                                (message.hasLocations || message.hasRoute))
+                            ? () => _handleShowOnMap(message)
+                            : null,
+                        onResend: message.isUser
+                            ? (text) => _resendMessage(text)
+                            : null,
                       );
                     },
                   ),
           ),
 
           // Input field
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ThemeColor.background,
-              border: Border(
-                top: BorderSide(
-                  color: ThemeColor.textSecondary.withOpacity(0.1),
-                  width: 1,
+          SafeArea(
+            top: false,
+            bottom: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: BoxDecoration(
+                color: ThemeColor.background,
+                border: Border(
+                  top: BorderSide(
+                    color: ThemeColor.textSecondary.withOpacity(0.1),
+                    width: 1,
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: CupertinoTextField(
-                    controller: _textController,
-                    placeholder: 'home.input_placeholder'.tr(),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _handleSend(),
-                    enabled: !_isSending,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: ThemeColor.inputBackground,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getModelIcon(_currentModel),
+                        size: 14,
+                        color: ThemeColor.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _currentModel,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: ThemeColor.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: _isSending ? null : _handleSend,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _isSending
-                          ? ThemeColor.textSecondary.withOpacity(0.3)
-                          : ThemeColor.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: _isSending
-                        ? const Center(
-                            child: CupertinoActivityIndicator(
-                              color: ThemeColor.background,
-                            ),
-                          )
-                        : const Icon(
-                            LucideIcons.send,
-                            size: 20,
-                            color: ThemeColor.background,
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CupertinoTextField(
+                          controller: _textController,
+                          placeholder: 'home.input_placeholder'.tr(),
+                          maxLines: null,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _handleSend(),
+                          enabled: !_isSending,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
+                          decoration: BoxDecoration(
+                            color: ThemeColor.inputBackground,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _isSending ? null : _handleSend,
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: _isSending
+                                ? ThemeColor.textSecondary.withOpacity(0.3)
+                                : ThemeColor.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: _isSending
+                              ? const Center(
+                                  child: CupertinoActivityIndicator(
+                                    color: ThemeColor.background,
+                                  ),
+                                )
+                              : const Icon(
+                                  LucideIcons.send,
+                                  size: 20,
+                                  color: ThemeColor.background,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

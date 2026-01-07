@@ -22,22 +22,21 @@ class RestAIService implements AIService {
 
   /// Build REST API URL for the specific model
   String _buildApiUrl() {
-    // Convert ws://localhost:5189 to http://localhost:5189
-    final baseUrl = EnvConfig.wsBaseUrl.replaceFirst('ws://', 'http://');
+    final baseUrl = EnvConfig.apiBaseUrl;
     String endpoint;
 
     switch (model.toLowerCase()) {
       case 'chatgpt':
-        endpoint = '/api/ai/chatgpt';
+        endpoint = '/model/gpt';
         break;
       case 'gemini':
-        endpoint = '/api/ai/gemini';
+        endpoint = '/model/gemini';
         break;
       case 'hybrid':
-        endpoint = '/api/ai/hybrid';
+        endpoint = '/model/hybrid';
         break;
       default:
-        endpoint = '/api/ai/chatgpt'; // Default to ChatGPT
+        endpoint = '/model/gpt'; // Default to ChatGPT (GPT endpoint)
     }
 
     return '$baseUrl$endpoint';
@@ -79,17 +78,59 @@ class RestAIService implements AIService {
           .map((msg) => '${msg.isUser ? "User" : "Assistant"}: ${msg.content}')
           .join('\n');
 
-      // Build system prompt with context
-      final systemPrompt = contextMessages.isEmpty
-          ? 'You are a helpful travel assistant.'
-          : 'You are a helpful travel assistant.\n\nConversation history:\n$contextMessages';
+      // Build system prompt with context and location instructions
+      final basePrompt = '''You are a helpful travel assistant.
 
-      // Prepare request body matching backend API
+CRITICAL: When providing travel recommendations with specific locations (landmarks, museums, restaurants, parks, etc.), you MUST include location data at the end of your response in this EXACT JSON format:
+
+```json
+{
+  "locations": [
+    {"name": "Location Name", "lat": 0.0, "lng": 0.0, "description": "Brief description"}
+  ]
+}
+```
+
+IMPORTANT RULES:
+1. Include a JSON block for EVERY place you recommend (not just one)
+2. Each location MUST have accurate, real GPS coordinates (latitude/longitude)
+3. DO NOT use placeholder coordinates like 0.0, 0.0
+4. Each location must have DIFFERENT coordinates (the actual location of that place)
+5. The "description" field is optional but helpful
+6. If the user asks for a route/directions, add: "route": {"type": "walking"} (or "driving", "cycling")
+
+EXAMPLE (notice MULTIPLE locations with DIFFERENT coordinates):
+"Amsterdam has amazing attractions! Here are my top picks:
+
+1. **Anne Frank House** - A moving historical museum
+2. **Rijksmuseum** - Home to Dutch masterpieces
+3. **Van Gogh Museum** - Dedicated to Van Gogh's works
+4. **Vondelpark** - Beautiful urban park
+
+```json
+{
+  "locations": [
+    {"name": "Anne Frank House", "lat": 52.3752, "lng": 4.8840, "description": "Historical museum"},
+    {"name": "Rijksmuseum", "lat": 52.3600, "lng": 4.8852, "description": "Dutch art museum"},
+    {"name": "Van Gogh Museum", "lat": 52.3584, "lng": 4.8811, "description": "Van Gogh collection"},
+    {"name": "Vondelpark", "lat": 52.3579, "lng": 4.8686, "description": "Urban park"}
+  ]
+}
+```"
+
+Remember: Include ALL locations you mention with their REAL coordinates!
+''';
+
+      final systemPrompt = contextMessages.isEmpty
+          ? basePrompt
+          : '$basePrompt\n\nConversation history:\n$contextMessages';
+
+      // Build complete message with system prompt and conversation history
+      final completeMessage = '$systemPrompt\n\n$message';
+
+      // Prepare request body matching NEW backend API format
       final requestBody = {
-        'prompt': message,
-        'model': null, // Let backend use default model for provider
-        'systemPrompt': systemPrompt,
-        'sessionId': _sessionId,
+        'message': completeMessage,
       };
 
       debugPrint('📤 Sending REST request to: $apiUrl');
@@ -101,6 +142,7 @@ class RestAIService implements AIService {
             Uri.parse(apiUrl),
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
             body: jsonEncode(requestBody),
           )
@@ -116,25 +158,64 @@ class RestAIService implements AIService {
           );
 
       final elapsed = DateTime.now().difference(startTime).inSeconds;
-      debugPrint('⏱️ Response received after ${elapsed}s');
+      debugPrint('⏱️ Response received after ${elapsed}s (status: ${response.statusCode})');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('📥 Response data keys: ${responseData.keys.join(", ")}');
 
         // Update metadata
         _lastMetadata = {
-          'provider': responseData['provider'],
-          'sessionId': responseData['sessionId'],
+          'model': model,
+          'provider': 'rest',
         };
 
-        // Update session ID from response
-        _sessionId = responseData['sessionId'] as String?;
+        // Extract response from NEW backend format
+        final responseText = responseData['response'];
 
-        final content = responseData['content'] as String? ?? '';
+        // Handle both string and object responses (Gemini might return object)
+        String content;
+        if (responseText is String) {
+          content = responseText;
+        } else if (responseText is Map) {
+          // For Gemini responses that might be objects, convert to JSON string
+          content = jsonEncode(responseText);
+        } else {
+          throw AIServiceException(
+            'Unexpected response format from server',
+            code: 'INVALID_RESPONSE',
+          );
+        }
+
         debugPrint('✅ Response complete (${content.length} chars)');
 
         // Yield the complete response at once
         yield content;
+      } else if (response.statusCode == 400) {
+        final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('❌ Bad request (400): ${errorData['error']}');
+        throw AIServiceException(
+          errorData['error'] ?? 'Bad request',
+          code: 'BAD_REQUEST',
+        );
+      } else if (response.statusCode == 500) {
+        debugPrint('❌ Server error (500): API key not configured');
+        throw AIServiceException(
+          'Server error: ${model.toUpperCase()} API key not configured',
+          code: 'SERVER_ERROR',
+        );
+      } else if (response.statusCode == 503) {
+        debugPrint('❌ Service unavailable (503)');
+        throw AIServiceException(
+          '${model.toUpperCase()} service is currently unavailable',
+          code: 'SERVICE_UNAVAILABLE',
+        );
+      } else if (response.statusCode == 504) {
+        debugPrint('❌ Gateway timeout (504)');
+        throw AIServiceException(
+          'Request to ${model.toUpperCase()} timed out',
+          code: 'GATEWAY_TIMEOUT',
+        );
       } else {
         debugPrint('❌ REST request failed with status ${response.statusCode}');
         debugPrint('Response body: ${response.body}');
@@ -167,11 +248,7 @@ class RestAIService implements AIService {
 
   @override
   Map<String, dynamic> getResponseMetadata() {
-    return {
-      'model': model,
-      'provider': 'rest',
-      ..._lastMetadata,
-    };
+    return {'model': model, 'provider': 'rest', ..._lastMetadata};
   }
 
   @override

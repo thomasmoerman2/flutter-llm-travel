@@ -1,17 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum MessageRole {
-  user,
-  assistant,
-  system,
-}
+enum MessageRole { user, assistant, system }
 
-enum MessageStatus {
-  sending,
-  sent,
-  error,
-  streaming,
-}
+enum MessageStatus { sending, sent, error, streaming }
 
 class ChatMessage {
   final String id;
@@ -103,6 +94,23 @@ class ChatMessage {
   bool get isSending => status == MessageStatus.sending;
   bool get isStreaming => status == MessageStatus.streaming;
   bool get hasError => status == MessageStatus.error;
+
+  /// Check if message has locations data
+  bool get hasLocations {
+    if (metadata == null) return false;
+    final locations = metadata!['locations'];
+    return locations != null && locations is List && locations.isNotEmpty;
+  }
+
+  bool get hasRoute {
+    if (metadata == null) return false;
+    final routeType = metadata!['routeType'];
+    if (routeType is String && routeType.isNotEmpty) {
+      return true;
+    }
+    final route = metadata!['route'];
+    return route != null;
+  }
 }
 
 class Conversation {
