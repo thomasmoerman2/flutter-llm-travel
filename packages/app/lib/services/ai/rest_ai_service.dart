@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../models/chat_message.dart';
 import '../env_config.dart';
 import 'ai_service.dart';
+import 'apple_intelligence_service.dart';
 
 /// REST-based AI service for ChatGPT, Gemini, and Hybrid
 class RestAIService implements AIService {
@@ -168,6 +170,7 @@ Remember: Include ALL locations you mention with their REAL coordinates!
         _lastMetadata = {
           'model': model,
           'provider': 'rest',
+          'enhanced': model.toLowerCase() == 'hybrid' && Platform.isIOS,
         };
 
         // Extract response from NEW backend format
@@ -189,8 +192,55 @@ Remember: Include ALL locations you mention with their REAL coordinates!
 
         debugPrint('✅ Response complete (${content.length} chars)');
 
-        // Yield the complete response at once
-        yield content;
+        // For Hybrid model, pass response to Apple Intelligence for refinement
+        if (model.toLowerCase() == 'hybrid' && Platform.isIOS) {
+          debugPrint('🔄 Hybrid mode: Passing response to Apple Intelligence for refinement...');
+
+          try {
+            final appleService = AppleIntelligenceService();
+
+            // Check if Apple Intelligence is available
+            final isAvailable = await appleService.isAvailable();
+            if (!isAvailable) {
+              debugPrint('⚠️ Apple Intelligence not available, returning hybrid response directly');
+              yield content;
+              return;
+            }
+
+            // Initialize Apple Intelligence
+            await appleService.initialize();
+
+            // Create refinement prompt
+            final refinementMessage = '''Please refine and enhance this travel recommendation response.
+Improve the formatting, add any helpful details, and ensure it's well-structured.
+IMPORTANT: If the original response contains a JSON code block with location data, you MUST preserve it exactly as-is at the end of your response.
+
+Original response:
+$content
+
+Enhanced response:''';
+
+            // Stream the refined response
+            await for (final chunk in appleService.sendMessage(
+              refinementMessage,
+              [],
+              'hybrid-refinement',
+            )) {
+              debugPrint('✅ Apple Intelligence refined response (${chunk.length} chars)');
+              yield chunk;
+            }
+
+            // Clean up
+            await appleService.dispose();
+          } catch (e) {
+            debugPrint('❌ Failed to refine with Apple Intelligence: $e');
+            debugPrint('⚠️ Falling back to hybrid response without refinement');
+            yield content;
+          }
+        } else {
+          // For non-hybrid models or non-iOS platforms, yield response directly
+          yield content;
+        }
       } else if (response.statusCode == 400) {
         final errorData = jsonDecode(response.body) as Map<String, dynamic>;
         debugPrint('❌ Bad request (400): ${errorData['error']}');

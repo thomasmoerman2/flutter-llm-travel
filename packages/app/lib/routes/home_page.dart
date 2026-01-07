@@ -3,9 +3,11 @@ import 'package:app/routes/login_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/chat_message.dart';
 import '../services/chat_service.dart';
+import '../services/env_config.dart';
 import '../services/firestore_access.dart';
 import '../services/preferences_service.dart';
 import '../services/theme_color.dart';
@@ -38,6 +40,8 @@ class HomePageContentState extends State<HomePageContent>
   List<ChatMessage> _messages = [];
   bool _isInitialized = false;
   bool _isSending = false;
+  bool _isApiAvailable = true;
+  bool _isCheckingApi = false;
   DateTime? _lastScrollTime;
 
   String? get currentConversationId => _conversationId;
@@ -67,6 +71,65 @@ class HomePageContentState extends State<HomePageContent>
     }
   }
 
+  /// Check if REST API is available for REST-based models
+  bool _isRestModel(String model) {
+    return model == 'ChatGPT' || model == 'Gemini' || model == 'Hybrid';
+  }
+
+  /// Check API availability by pinging the backend
+  Future<void> _checkApiAvailability() async {
+    if (!_isRestModel(_currentModel)) {
+      // Apple Intelligence doesn't need API check
+      setState(() {
+        _isApiAvailable = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingApi = true;
+    });
+
+    try {
+      debugPrint('🔍 Checking API availability at ${EnvConfig.apiBaseUrl}');
+
+      // Try to connect to the base URL or a known endpoint
+      // We'll use a simple GET to the base URL with a short timeout
+      final response = await http
+          .get(Uri.parse(EnvConfig.apiBaseUrl))
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              throw TimeoutException('API connection timeout');
+            },
+          );
+
+      // Accept any response code (200, 404, etc.) as long as we got a response
+      // This means the server is reachable
+      final isAvailable = response.statusCode >= 0;
+      debugPrint(
+        isAvailable
+            ? '✅ API is available (status: ${response.statusCode})'
+            : '❌ API unavailable',
+      );
+
+      if (mounted) {
+        setState(() {
+          _isApiAvailable = isAvailable;
+          _isCheckingApi = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ API check failed: $e');
+      if (mounted) {
+        setState(() {
+          _isApiAvailable = false;
+          _isCheckingApi = false;
+        });
+      }
+    }
+  }
+
   /// Public method to refresh model preference (called from RootLayout)
   Future<void> refreshModelPreference() async {
     final newModel = await PreferencesService.getSelectedModel();
@@ -92,6 +155,9 @@ class HomePageContentState extends State<HomePageContent>
       setState(() {
         _currentModel = newModel;
       });
+
+      // Check API availability when switching to REST models
+      await _checkApiAvailability();
     }
   }
 
@@ -110,6 +176,9 @@ class HomePageContentState extends State<HomePageContent>
     try {
       // Load the saved model preference first
       await _loadModelPreference();
+
+      // Check API availability for REST models
+      await _checkApiAvailability();
 
       // Initialize conversation for both logged-in and guest users
       final user = FirebaseAuth.instance.currentUser;
@@ -492,11 +561,14 @@ class HomePageContentState extends State<HomePageContent>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        _getModelIcon(_currentModel),
-                        size: 14,
-                        color: ThemeColor.textSecondary,
-                      ),
+                      if (_isCheckingApi)
+                        const CupertinoActivityIndicator(radius: 7)
+                      else
+                        Icon(
+                          _getModelIcon(_currentModel),
+                          size: 14,
+                          color: ThemeColor.textSecondary,
+                        ),
                       const SizedBox(width: 6),
                       Text(
                         _currentModel,
@@ -506,37 +578,74 @@ class HomePageContentState extends State<HomePageContent>
                           color: ThemeColor.textSecondary,
                         ),
                       ),
+                      if (!_isApiAvailable && !_isCheckingApi && _isRestModel(_currentModel)) ...[
+                        const SizedBox(width: 6),
+                        const Icon(
+                          LucideIcons.wifiOff,
+                          size: 14,
+                          color: Color(0xFFEF5350),
+                        ),
+                      ],
                     ],
                   ),
+                  if (!_isApiAvailable && !_isCheckingApi && _isRestModel(_currentModel)) ...[
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: _checkApiAvailability,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            LucideIcons.refreshCw,
+                            size: 11,
+                            color: Color(0xFFEF5350),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'API unavailable - Tap to retry',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFFEF5350),
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
                         child: CupertinoTextField(
                           controller: _textController,
-                          placeholder: 'home.input_placeholder'.tr(),
+                          placeholder: (!_isApiAvailable && _isRestModel(_currentModel))
+                              ? 'API unavailable'
+                              : 'home.input_placeholder'.tr(),
                           maxLines: null,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => _handleSend(),
-                          enabled: !_isSending,
+                          enabled: !_isSending && _isApiAvailable,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: ThemeColor.inputBackground,
+                            color: (!_isApiAvailable && _isRestModel(_currentModel))
+                                ? ThemeColor.inputBackground.withOpacity(0.5)
+                                : ThemeColor.inputBackground,
                             borderRadius: BorderRadius.circular(24),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       GestureDetector(
-                        onTap: _isSending ? null : _handleSend,
+                        onTap: (_isSending || !_isApiAvailable) ? null : _handleSend,
                         child: Container(
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: _isSending
+                            color: (_isSending || !_isApiAvailable)
                                 ? ThemeColor.textSecondary.withOpacity(0.3)
                                 : ThemeColor.primary,
                             shape: BoxShape.circle,
@@ -547,8 +656,10 @@ class HomePageContentState extends State<HomePageContent>
                                     color: ThemeColor.background,
                                   ),
                                 )
-                              : const Icon(
-                                  LucideIcons.send,
+                              : Icon(
+                                  !_isApiAvailable && _isRestModel(_currentModel)
+                                      ? LucideIcons.wifiOff
+                                      : LucideIcons.send,
                                   size: 20,
                                   color: ThemeColor.background,
                                 ),
