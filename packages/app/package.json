@@ -1,0 +1,6 @@
+{
+    "name": "@research/app",
+    "scripts": {
+        "dev": "flutter run"
+    }
+}
