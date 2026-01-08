@@ -136,17 +136,21 @@ class _SettingsPageState extends State<SettingsPage> {
 
       for (final doc in routesSnapshot.docs) {
         final data = doc.data();
-        final locations = (data['locations'] as List?)
-            ?.map((loc) => loc as Map<String, dynamic>)
-            .toList() ?? [];
+        final locations =
+            (data['locations'] as List?)
+                ?.map((loc) => loc as Map<String, dynamic>)
+                .toList() ??
+            [];
 
         await OfflineStorageService.saveRoute(
           id: doc.id,
           name: data['name'] as String? ?? 'Unnamed Route',
           locations: locations,
           routeType: data['routeType'] as String?,
-          createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          createdAt:
+              (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          updatedAt:
+              (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );
         routesDownloaded++;
       }
@@ -156,7 +160,9 @@ class _SettingsPageState extends State<SettingsPage> {
       // Download all conversations
       debugPrint('📥 Fetching conversations from Firestore...');
       final firestoreAccess = FirestoreAccess();
-      final conversations = await firestoreAccess.getConversations(user.uid).first;
+      final conversations = await firestoreAccess
+          .getConversations(user.uid)
+          .first;
 
       debugPrint('📥 Found ${conversations.length} conversations');
 
@@ -175,7 +181,9 @@ class _SettingsPageState extends State<SettingsPage> {
         );
 
         // Download messages for this conversation
-        final messages = await firestoreAccess.getMessages(conversation.id).first;
+        final messages = await firestoreAccess
+            .getMessages(conversation.id)
+            .first;
 
         await OfflineStorageService.saveConversationMessages(
           conversationId: conversation.id,
@@ -348,20 +356,6 @@ class _SettingsPageState extends State<SettingsPage> {
       models.add('Hybrid');
     }
     return models;
-  }
-
-  bool _isModelDisabled(String model) {
-    if (model == 'Apple Intelligence' && !_isIOS) {
-      return true;
-    }
-    return false;
-  }
-
-  String? _getModelDisabledReason(String model) {
-    if (model == 'Apple Intelligence' && !_isIOS) {
-      return 'Only available on iOS devices with iOS 18.0+';
-    }
-    return null;
   }
 
   String get _currentLanguageDisplay {
@@ -764,20 +758,27 @@ class _SettingsPageState extends State<SettingsPage> {
                                   const SizedBox(height: 16),
                                   // Download All Data button
                                   GestureDetector(
-                                    onTap: _isDownloadingData ? null : _downloadAllData,
+                                    onTap: _isDownloadingData
+                                        ? null
+                                        : _downloadAllData,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 12,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: ThemeColor.primary.withOpacity(0.1),
+                                        color: ThemeColor.primary.withOpacity(
+                                          0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: _isDownloadingData
                                           ? const Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
-                                                CupertinoActivityIndicator(radius: 10),
+                                                CupertinoActivityIndicator(
+                                                  radius: 10,
+                                                ),
                                                 SizedBox(width: 8),
                                                 Text(
                                                   'Downloading...',
@@ -790,7 +791,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                               ],
                                             )
                                           : const Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
                                                 Icon(
                                                   LucideIcons.download,

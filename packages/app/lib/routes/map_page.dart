@@ -787,257 +787,262 @@ class MapPageContentState extends State<MapPageContent> {
         children: [
           Focus(canRequestFocus: false, skipTraversal: true, child: _mapWidget),
 
-        // Local suggestions list
-        if (!_showResults &&
-            _showSuggestions &&
-            _filteredSuggestions.isNotEmpty)
-          Positioned(
-            key: const ValueKey('map_suggestions'),
-            left: 16,
-            right: 16,
-            bottom: widget.bottomInset + 80 + keyboardHeight,
-            child: _buildSuggestionsList(),
-          ),
+          // Local suggestions list
+          if (!_showResults &&
+              _showSuggestions &&
+              _filteredSuggestions.isNotEmpty)
+            Positioned(
+              key: const ValueKey('map_suggestions'),
+              left: 16,
+              right: 16,
+              bottom: widget.bottomInset + 80 + keyboardHeight,
+              child: _buildSuggestionsList(),
+            ),
 
-        // Search results list
-        if (_showResults && _searchResults.isNotEmpty)
+          // Search results list
+          if (_showResults && _searchResults.isNotEmpty)
+            Positioned(
+              key: const ValueKey('map_results'),
+              left: 16,
+              right: 16,
+              bottom: widget.bottomInset + 80 + keyboardHeight,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                decoration: BoxDecoration(
+                  color: ThemeColor.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1A000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Color(0x1A000000),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Search Results',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ThemeColor.textPrimary,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _showResults = false;
+                              });
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: ThemeColor.background,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                LucideIcons.x,
+                                size: 16,
+                                color: ThemeColor.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(8),
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          final result = _searchResults[index];
+                          return GestureDetector(
+                            onTap: () => _goToResult(result),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: ThemeColor.background,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: ThemeColor.primary.withOpacity(
+                                        0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Icon(
+                                      LucideIcons.mapPin,
+                                      size: 20,
+                                      color: ThemeColor.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          result.shortName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: ThemeColor.textPrimary,
+                                          ),
+                                        ),
+                                        if (result.subtitle.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            result.subtitle,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: ThemeColor.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    LucideIcons.chevronRight,
+                                    size: 16,
+                                    color: ThemeColor.textSecondary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Search bar
           Positioned(
-            key: const ValueKey('map_results'),
+            key: const ValueKey('map_search_bar'),
             left: 16,
             right: 16,
-            bottom: widget.bottomInset + 80 + keyboardHeight,
+            bottom: widget.bottomInset + keyboardHeight,
             child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: ThemeColor.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(24),
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x1A000000),
                     blurRadius: 16,
-                    offset: Offset(0, 4),
+                    offset: Offset(0, 6),
                   ),
                 ],
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Color(0x1A000000), width: 1),
+                  Expanded(
+                    child: CupertinoTextField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      placeholder: 'map.input_placeholder'.tr(),
+                      placeholderStyle: const TextStyle(
+                        color: ThemeColor.textSecondary,
+                        fontSize: 14,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ThemeColor.background,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: ThemeColor.textPrimary,
+                      ),
+                      onSubmitted: (_) => _performSearch(),
+                    ),
+                  ),
+                  if (_hasQuery) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: _clearSearch,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: ThemeColor.textSecondary.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          LucideIcons.x,
+                          size: 14,
+                          color: ThemeColor.textSecondary,
+                        ),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Search Results',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: ThemeColor.textPrimary,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _showResults = false;
-                            });
-                          },
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: ThemeColor.background,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(
-                              LucideIcons.x,
-                              size: 16,
-                              color: ThemeColor.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        final result = _searchResults[index];
-                        return GestureDetector(
-                          onTap: () => _goToResult(result),
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: ThemeColor.background,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: ThemeColor.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Icon(
-                                    LucideIcons.mapPin,
-                                    size: 20,
-                                    color: ThemeColor.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        result.shortName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: ThemeColor.textPrimary,
-                                        ),
-                                      ),
-                                      if (result.subtitle.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          result.subtitle,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: ThemeColor.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                const Icon(
-                                  LucideIcons.chevronRight,
-                                  size: 16,
-                                  color: ThemeColor.textSecondary,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-        // Search bar
-        Positioned(
-          key: const ValueKey('map_search_bar'),
-          left: 16,
-          right: 16,
-          bottom: widget.bottomInset + keyboardHeight,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: ThemeColor.surface,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1A000000),
-                  blurRadius: 16,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: CupertinoTextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    placeholder: 'map.input_placeholder'.tr(),
-                    placeholderStyle: const TextStyle(
-                      color: ThemeColor.textSecondary,
-                      fontSize: 14,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: ThemeColor.background,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: ThemeColor.textPrimary,
-                    ),
-                    onSubmitted: (_) => _performSearch(),
-                  ),
-                ),
-                if (_hasQuery) ...[
-                  const SizedBox(width: 8),
+                  ],
+                  const SizedBox(width: 10),
                   GestureDetector(
-                    onTap: _clearSearch,
+                    onTap: _isSearching ? null : _performSearch,
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: ThemeColor.textSecondary.withOpacity(0.12),
+                        color: _isSearching
+                            ? ThemeColor.primary.withOpacity(0.5)
+                            : ThemeColor.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        LucideIcons.x,
-                        size: 14,
-                        color: ThemeColor.textSecondary,
-                      ),
+                      child: _isSearching
+                          ? const CupertinoActivityIndicator(
+                              color: ThemeColor.background,
+                              radius: 8,
+                            )
+                          : const Icon(
+                              LucideIcons.search,
+                              size: 18,
+                              color: ThemeColor.background,
+                            ),
                     ),
                   ),
                 ],
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: _isSearching ? null : _performSearch,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: _isSearching
-                          ? ThemeColor.primary.withOpacity(0.5)
-                          : ThemeColor.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: _isSearching
-                        ? const CupertinoActivityIndicator(
-                            color: ThemeColor.background,
-                            radius: 8,
-                          )
-                        : const Icon(
-                            LucideIcons.search,
-                            size: 18,
-                            color: ThemeColor.background,
-                          ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
         ],
       ),
     );
@@ -1478,16 +1483,6 @@ class MapPageContentState extends State<MapPageContent> {
     );
   }
 
-  Future<void> _createOptimizedRoute(List<LocationData> locations) async {
-    debugPrint(
-      '🛣️ Creating optimized route for ${locations.length} locations',
-    );
-
-    // TODO: Call Mapbox Optimization API to get the best route order
-    // For now, we'll use the locations as-is and show with driving route
-    await showRouteOnMap(locations, RouteType.driving);
-  }
-
   void _saveRouteDialog(List<LocationData> locations, RouteType? routeType) {
     final TextEditingController nameController = TextEditingController();
 
@@ -1696,10 +1691,13 @@ class MapPageContentState extends State<MapPageContent> {
                                 }
 
                                 if (snapshot.hasError) {
-                                  debugPrint('❌ Error loading routes: ${snapshot.error}');
+                                  debugPrint(
+                                    '❌ Error loading routes: ${snapshot.error}',
+                                  );
                                   return Center(
                                     child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           'Error loading routes',

@@ -131,9 +131,7 @@ Remember: Include ALL locations you mention with their REAL coordinates!
       final completeMessage = '$systemPrompt\n\n$message';
 
       // Prepare request body matching NEW backend API format
-      final requestBody = {
-        'message': completeMessage,
-      };
+      final requestBody = {'message': completeMessage};
 
       debugPrint('📤 Sending REST request to: $apiUrl');
       debugPrint('📝 Request body: ${jsonEncode(requestBody)}');
@@ -160,7 +158,9 @@ Remember: Include ALL locations you mention with their REAL coordinates!
           );
 
       final elapsed = DateTime.now().difference(startTime).inSeconds;
-      debugPrint('⏱️ Response received after ${elapsed}s (status: ${response.statusCode})');
+      debugPrint(
+        '⏱️ Response received after ${elapsed}s (status: ${response.statusCode})',
+      );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body) as Map<String, dynamic>;
@@ -194,7 +194,9 @@ Remember: Include ALL locations you mention with their REAL coordinates!
 
         // For Hybrid model, pass response to Apple Intelligence for refinement
         if (model.toLowerCase() == 'hybrid' && Platform.isIOS) {
-          debugPrint('🔄 Hybrid mode: Passing response to Apple Intelligence for refinement...');
+          debugPrint(
+            '🔄 Hybrid mode: Passing response to Apple Intelligence for refinement...',
+          );
 
           try {
             final appleService = AppleIntelligenceService();
@@ -202,7 +204,9 @@ Remember: Include ALL locations you mention with their REAL coordinates!
             // Check if Apple Intelligence is available
             final isAvailable = await appleService.isAvailable();
             if (!isAvailable) {
-              debugPrint('⚠️ Apple Intelligence not available, returning hybrid response directly');
+              debugPrint(
+                '⚠️ Apple Intelligence not available, returning hybrid response directly',
+              );
               yield content;
               return;
             }
@@ -211,7 +215,8 @@ Remember: Include ALL locations you mention with their REAL coordinates!
             await appleService.initialize();
 
             // Create refinement prompt
-            final refinementMessage = '''Please refine and enhance this travel recommendation response.
+            final refinementMessage =
+                '''Please refine and enhance this travel recommendation response.
 Improve the formatting, add any helpful details, and ensure it's well-structured.
 IMPORTANT: If the original response contains a JSON code block with location data, you MUST preserve it exactly as-is at the end of your response.
 
@@ -226,7 +231,9 @@ Enhanced response:''';
               [],
               'hybrid-refinement',
             )) {
-              debugPrint('✅ Apple Intelligence refined response (${chunk.length} chars)');
+              debugPrint(
+                '✅ Apple Intelligence refined response (${chunk.length} chars)',
+              );
               yield chunk;
             }
 
