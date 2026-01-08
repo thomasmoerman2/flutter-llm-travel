@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "lerna run dev --scope={research/app, research/backend} --stream --parallel"
+    "dev": "lerna run dev --scope={@research/app,@research/backend} --stream --parallel"
   },
   "repository": {
     "type": "git",

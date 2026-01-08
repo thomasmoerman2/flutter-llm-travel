@@ -188,10 +188,8 @@ class ConversationSidebar extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 8),
                                     GestureDetector(
-                                      onTap: () => _confirmDelete(
-                                        context,
-                                        conversation,
-                                      ),
+                                      onTap: () =>
+                                          _confirmDelete(context, conversation),
                                       child: const Icon(
                                         LucideIcons.trash2,
                                         size: 16,
