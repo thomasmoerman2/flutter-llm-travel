@@ -13,6 +13,7 @@ import '../services/mapbox_directions_service.dart';
 import '../services/offline_storage_service.dart';
 import '../services/theme_color.dart';
 import '../services/mapbox_search_service.dart';
+import '../services/google_places_service.dart';
 
 /// Content-only widget for the map page (without navigation)
 /// Used inside RootLayout
@@ -51,6 +52,12 @@ class MapPageContentState extends State<MapPageContent> {
   List<String> _filteredSuggestions = [];
   bool _showSuggestions = false;
   bool _hasQuery = false;
+
+  // Google Places state
+  List<PlaceResult> _placeSuggestions = [];
+  bool _isFetchingPlaces = false;
+  PointAnnotationManager? _placesAnnotationManager;
+  CircleAnnotationManager? _placesCircleManager; // Alternative using circles
 
   @override
   void initState() {
@@ -106,6 +113,14 @@ class MapPageContentState extends State<MapPageContent> {
     // Create polyline annotation manager for routes
     _polylineAnnotationManager = await mapboxMap.annotations
         .createPolylineAnnotationManager();
+
+    // Create point annotation manager for Google Places suggestions
+    _placesAnnotationManager = await mapboxMap.annotations
+        .createPointAnnotationManager();
+
+    // Also create circle manager as alternative
+    _placesCircleManager = await mapboxMap.annotations
+        .createCircleAnnotationManager();
 
     debugPrint('✅ Map annotation managers created');
     _applyPendingMapUpdate();
@@ -267,6 +282,610 @@ class MapPageContentState extends State<MapPageContent> {
     _restoreFocusIfNeeded(true);
   }
 
+  /// Suggest nearby places using Google Places API based on route locations
+  Future<void> _suggestNearbyPlaces() async {
+    debugPrint('🟠 _suggestNearbyPlaces() called');
+    debugPrint('   Current locations count: ${_currentLocations.length}');
+
+    if (_mapboxMap == null) {
+      debugPrint('❌ Map not initialized');
+      return;
+    }
+
+    if (_currentLocations.isEmpty) {
+      debugPrint('⚠️ No locations to search around');
+      return;
+    }
+
+    setState(() {
+      _isFetchingPlaces = true;
+      _showResults = false;
+      _showSuggestions = false;
+    });
+
+    try {
+      // Calculate center of current route locations (not map center!)
+      double centerLat = 0;
+      double centerLng = 0;
+      for (final location in _currentLocations) {
+        centerLat += location.latitude;
+        centerLng += location.longitude;
+      }
+      centerLat /= _currentLocations.length;
+      centerLng /= _currentLocations.length;
+
+      debugPrint(
+        '🔍 Fetching places near route center at ($centerLat, $centerLng)',
+      );
+      debugPrint('   Route has ${_currentLocations.length} locations:');
+      for (var i = 0; i < _currentLocations.length; i++) {
+        final loc = _currentLocations[i];
+        debugPrint('   [$i] ${loc.name} at (${loc.latitude}, ${loc.longitude})');
+      }
+
+      // Fetch nearby places (will use time-based types)
+      // Use smaller radius for closer suggestions
+      final places = await GooglePlacesService.searchNearby(
+        latitude: centerLat,
+        longitude: centerLng,
+        radius: 500, // 500m radius - much closer!
+      );
+
+      debugPrint('🟠 Google Places API returned ${places.length} places');
+
+      setState(() {
+        _placeSuggestions = places;
+        _isFetchingPlaces = false;
+      });
+
+      if (places.isNotEmpty) {
+        debugPrint('🟠 Calling _showPlacesOnMap with ${places.length} places');
+        await _showPlacesOnMap(places);
+
+        debugPrint('🟠 Calling _fitCameraToPlaces');
+        await _fitCameraToPlaces(places);
+
+        debugPrint('✅ Successfully showed ${places.length} place markers');
+      } else {
+        debugPrint('⚠️ No places found');
+        if (!mounted) return;
+        _showNoPlacesFoundDialog();
+      }
+    } catch (e) {
+      setState(() {
+        _isFetchingPlaces = false;
+        _placeSuggestions = [];
+      });
+
+      if (!mounted) return;
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Places Error'),
+          content: Text('Failed to fetch nearby places: ${e.toString()}'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  /// Show place markers on the map with tap listeners
+  Future<void> _showPlacesOnMap(List<PlaceResult> places) async {
+    if (_placesAnnotationManager == null) {
+      debugPrint('❌ Places annotation manager is null!');
+      return;
+    }
+
+    debugPrint('🟠 Clearing old place markers...');
+    await _placesAnnotationManager!.deleteAll();
+
+    debugPrint('🟠 Creating ${places.length} orange place markers...');
+    final annotations = <PointAnnotationOptions>[];
+
+    for (var i = 0; i < places.length; i++) {
+      final place = places[i];
+      debugPrint('   [$i] ${place.name} at (${place.latitude}, ${place.longitude})');
+
+      try {
+        final annotation = PointAnnotationOptions(
+          geometry: Point(
+            coordinates: Position(place.longitude, place.latitude),
+          ),
+          iconImage: 'marker-15',
+          iconSize: 2.5, // Even larger for visibility
+          iconAnchor: IconAnchor.BOTTOM,
+          iconColor: 0xFFFF6B35, // Vibrant orange
+        );
+        annotations.add(annotation);
+        debugPrint('   ✓ Annotation $i created');
+      } catch (e) {
+        debugPrint('   ✗ Error creating annotation $i: $e');
+      }
+    }
+
+    debugPrint('🟠 Total annotations to create: ${annotations.length}');
+
+    final createdAnnotations = await _placesAnnotationManager!.createMulti(annotations);
+    debugPrint('✅ Created ${createdAnnotations.length} point annotations');
+
+    if (createdAnnotations.isEmpty && places.isNotEmpty) {
+      debugPrint('⚠️ WARNING: Places exist but no point markers created!');
+    }
+
+    // ALSO create circle markers as backup (we know these work)
+    debugPrint('🔵 Creating backup circle markers...');
+    if (_placesCircleManager != null) {
+      await _placesCircleManager!.deleteAll();
+
+      final circleAnnotations = <CircleAnnotationOptions>[];
+      for (var i = 0; i < places.length; i++) {
+        final place = places[i];
+        circleAnnotations.add(
+          CircleAnnotationOptions(
+            geometry: Point(
+              coordinates: Position(place.longitude, place.latitude),
+            ),
+            circleRadius: 15.0, // Larger for visibility
+            circleColor: 0xFFFF6B35, // Orange
+            circleStrokeColor: 0xFFFFFFFF, // White stroke
+            circleStrokeWidth: 3.0,
+          ),
+        );
+      }
+
+      final createdCircles = await _placesCircleManager!.createMulti(circleAnnotations);
+      debugPrint('✅ Created ${createdCircles.length} orange circle markers');
+    }
+
+    // Verify markers are still there after creation
+    await Future.delayed(const Duration(milliseconds: 100));
+    final allAnnotations = await _placesAnnotationManager!.getAnnotations();
+    debugPrint('🔍 Verification: ${allAnnotations.length} point markers exist after creation');
+
+    if (allAnnotations.isEmpty && createdAnnotations.isNotEmpty) {
+      debugPrint('🚨 CRITICAL: Point markers were created but disappeared immediately!');
+    }
+
+    // Add tap listener for place markers
+    _placesAnnotationManager!.addOnPointAnnotationClickListener(
+      _PlaceAnnotationClickListener(
+        onTap: (annotation) {
+          // Find which place was tapped based on coordinates
+          final tappedCoords = annotation.geometry.coordinates;
+          for (final place in _placeSuggestions) {
+            if ((place.longitude - tappedCoords.lng).abs() < 0.0001 &&
+                (place.latitude - tappedCoords.lat).abs() < 0.0001) {
+              debugPrint('🟠 Place marker tapped: ${place.name}');
+              _showPlaceDetailsModal(place);
+              break;
+            }
+          }
+        },
+      ),
+    );
+
+    // Also add tap listener for circles
+    if (_placesCircleManager != null) {
+      _placesCircleManager!.addOnCircleAnnotationClickListener(
+        _CircleAnnotationClickListener(
+          onTap: (annotation) {
+            final tappedCoords = annotation.geometry.coordinates;
+            for (final place in _placeSuggestions) {
+              if ((place.longitude - tappedCoords.lng).abs() < 0.0001 &&
+                  (place.latitude - tappedCoords.lat).abs() < 0.0001) {
+                debugPrint('🟠 Circle marker tapped: ${place.name}');
+                _showPlaceDetailsModal(place);
+                break;
+              }
+            }
+          },
+        ),
+      );
+    }
+  }
+
+  /// Show modal with place details and option to add to route
+  void _showPlaceDetailsModal(PlaceResult place) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.5,
+        decoration: const BoxDecoration(
+          color: ThemeColor.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ThemeColor.textSecondary.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Place name
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF6B35).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              LucideIcons.sparkles,
+                              size: 24,
+                              color: Color(0xFFFF6B35),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              place.name,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: ThemeColor.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Rating
+                      if (place.rating != null) ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              LucideIcons.star,
+                              size: 18,
+                              color: Color(0xFFFFA000),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              place.ratingDisplay,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ThemeColor.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Type
+                      Row(
+                        children: [
+                          const Icon(
+                            LucideIcons.mapPin,
+                            size: 18,
+                            color: ThemeColor.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            place.typeDescription,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: ThemeColor.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Address
+                      if (place.vicinity != null) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              LucideIcons.navigation,
+                              size: 18,
+                              color: ThemeColor.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                place.vicinity!,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: ThemeColor.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      // Open now indicator
+                      if (place.openNow != null) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Icon(
+                              LucideIcons.clock,
+                              size: 18,
+                              color: place.openNow!
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFFF44336),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              place.openNow! ? 'Open now' : 'Closed',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: place.openNow!
+                                    ? const Color(0xFF4CAF50)
+                                    : const Color(0xFFF44336),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+
+                      // Divider
+                      Container(
+                        height: 1,
+                        color: ThemeColor.textSecondary.withOpacity(0.1),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Action buttons
+                      Row(
+                        children: [
+                          // Zoom to place button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pop(context);
+                                _goToPlace(place);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: ThemeColor.textSecondary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      LucideIcons.zoomIn,
+                                      size: 18,
+                                      color: ThemeColor.textPrimary,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Zoom to Place',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: ThemeColor.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          // Add to route button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pop(context);
+                                _addPlaceToRoute(place);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF6B35),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      LucideIcons.plus,
+                                      size: 18,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Add to Route',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Add a place to the current route
+  void _addPlaceToRoute(PlaceResult place) {
+    // Convert PlaceResult to LocationData
+    final newLocation = LocationData(
+      name: place.name,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      description: place.vicinity ?? place.typeDescription,
+      day: null,
+    );
+
+    // Add to current locations
+    final updatedLocations = [..._currentLocations, newLocation];
+
+    debugPrint('✅ Added ${place.name} to route (${updatedLocations.length} total locations)');
+
+    // Show the updated route on the map
+    if (updatedLocations.length >= 2) {
+      // If we have multiple locations, show as a route
+      showRouteOnMap(updatedLocations, RouteType.walking);
+    } else {
+      // If only one location, just show the marker
+      showLocationsOnMap(updatedLocations);
+    }
+
+    // Show confirmation
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Added to Route'),
+        content: Text(
+          '${place.name} has been added to your route with ${updatedLocations.length} ${updatedLocations.length == 1 ? 'location' : 'locations'}.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Fit camera to show all places
+  Future<void> _fitCameraToPlaces(List<PlaceResult> places) async {
+    if (_mapboxMap == null || places.isEmpty) return;
+
+    if (places.length == 1) {
+      final place = places.first;
+      await _mapboxMap!.flyTo(
+        CameraOptions(
+          center: Point(
+            coordinates: Position(place.longitude, place.latitude),
+          ),
+          zoom: 15,
+        ),
+        MapAnimationOptions(duration: 800),
+      );
+      return;
+    }
+
+    // Calculate bounds
+    double minLng = places.first.longitude;
+    double maxLng = places.first.longitude;
+    double minLat = places.first.latitude;
+    double maxLat = places.first.latitude;
+
+    for (final place in places) {
+      if (place.longitude < minLng) minLng = place.longitude;
+      if (place.longitude > maxLng) maxLng = place.longitude;
+      if (place.latitude < minLat) minLat = place.latitude;
+      if (place.latitude > maxLat) maxLat = place.latitude;
+    }
+
+    final centerLng = (minLng + maxLng) / 2;
+    final centerLat = (minLat + maxLat) / 2;
+
+    final lngDiff = maxLng - minLng;
+    final latDiff = maxLat - minLat;
+    final maxDiff = lngDiff > latDiff ? lngDiff : latDiff;
+
+    double zoom = 12;
+    if (maxDiff > 5) {
+      zoom = 5;
+    } else if (maxDiff > 2) {
+      zoom = 7;
+    } else if (maxDiff > 1) {
+      zoom = 8;
+    } else if (maxDiff > 0.5) {
+      zoom = 9;
+    } else if (maxDiff > 0.2) {
+      zoom = 10;
+    } else if (maxDiff > 0.1) {
+      zoom = 11;
+    }
+
+    await _mapboxMap!.flyTo(
+      CameraOptions(
+        center: Point(coordinates: Position(centerLng, centerLat)),
+        zoom: zoom,
+        pitch: 0,
+        bearing: 0,
+      ),
+      MapAnimationOptions(duration: 800),
+    );
+  }
+
+  /// Navigate to a selected place
+  void _goToPlace(PlaceResult place) {
+    if (_mapboxMap != null) {
+      _mapboxMap!.flyTo(
+        CameraOptions(
+          center: Point(
+            coordinates: Position(place.longitude, place.latitude),
+          ),
+          zoom: 16,
+        ),
+        MapAnimationOptions(duration: 600),
+      );
+    }
+  }
+
+  void _showNoPlacesFoundDialog() {
+    final timeDesc = GooglePlacesService.getPlaceTypeDescription(DateTime.now());
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('No Places Found'),
+        content: Text(
+          'No $timeDesc found in this area. Try moving the map to a different location.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _selectSuggestion(String suggestion) {
     _searchController.text = suggestion;
     _searchController.selection = TextSelection.fromPosition(
@@ -366,12 +985,22 @@ class MapPageContentState extends State<MapPageContent> {
     await _pointAnnotationManager!.createMulti(annotations);
   }
 
-  Future<void> _clearMapOverlays() async {
-    debugPrint('🧹 Clearing all map overlays...');
+  Future<void> _clearMapOverlays({bool preservePlaces = false}) async {
+    debugPrint('🧹 Clearing map overlays (preservePlaces: $preservePlaces)...');
     await _pointAnnotationManager?.deleteAll();
     await _circleAnnotationManager?.deleteAll();
     await _labelAnnotationManager?.deleteAll();
     await _polylineAnnotationManager?.deleteAll();
+
+    // Only clear place markers if not preserving them
+    if (!preservePlaces) {
+      await _placesAnnotationManager?.deleteAll();
+      await _placesCircleManager?.deleteAll();
+      debugPrint('   Cleared place markers');
+    } else {
+      debugPrint('   Preserved place markers');
+    }
+
     debugPrint('✅ Map overlays cleared');
   }
 
@@ -1043,6 +1672,69 @@ class MapPageContentState extends State<MapPageContent> {
               ),
             ),
           ),
+
+          // Floating action button for place suggestions (only show when there are locations)
+          if (_currentLocations.isNotEmpty)
+            Positioned(
+              right: 16,
+              bottom: widget.bottomInset + 70 + keyboardHeight,
+              child: GestureDetector(
+                onTap: _isFetchingPlaces ? null : _suggestNearbyPlaces,
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: _isFetchingPlaces
+                        ? const Color(0xFFFF6B35).withOpacity(0.5)
+                        : const Color(0xFFFF6B35), // Orange for suggestions
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _isFetchingPlaces
+                      ? const CupertinoActivityIndicator(
+                          color: Colors.white,
+                          radius: 12,
+                        )
+                      : Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            const Icon(
+                              LucideIcons.sparkles,
+                              size: 24,
+                              color: Colors.white,
+                            ),
+                            // Debug indicator showing count
+                            if (_placeSuggestions.isNotEmpty)
+                              Positioned(
+                                right: 4,
+                                top: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    '${_placeSuggestions.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1130,8 +1822,8 @@ class MapPageContentState extends State<MapPageContent> {
       _showSuggestions = false;
     });
 
-    debugPrint('🧹 Clearing existing map overlays');
-    await _clearMapOverlays();
+    debugPrint('🧹 Clearing existing map overlays (preserving places)');
+    await _clearMapOverlays(preservePlaces: true);
     debugPrint('📍 Adding ${locations.length} location markers');
     await _showLocationMarkers(locations);
 
@@ -1183,8 +1875,8 @@ class MapPageContentState extends State<MapPageContent> {
       return;
     }
 
-    debugPrint('🧹 Clearing existing map overlays');
-    await _clearMapOverlays();
+    debugPrint('🧹 Clearing existing map overlays (preserving places)');
+    await _clearMapOverlays(preservePlaces: true);
     debugPrint('📍 Adding ${locations.length} location markers');
     await _showLocationMarkers(locations);
 
@@ -1985,6 +2677,17 @@ class _CircleAnnotationClickListener extends OnCircleAnnotationClickListener {
 
   @override
   void onCircleAnnotationClick(CircleAnnotation annotation) {
+    onTap(annotation);
+  }
+}
+
+class _PlaceAnnotationClickListener extends OnPointAnnotationClickListener {
+  final void Function(PointAnnotation) onTap;
+
+  _PlaceAnnotationClickListener({required this.onTap});
+
+  @override
+  void onPointAnnotationClick(PointAnnotation annotation) {
     onTap(annotation);
   }
 }
