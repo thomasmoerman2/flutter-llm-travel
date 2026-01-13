@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -829,7 +828,7 @@ class MapPageContentState extends State<MapPageContent> {
       description: place.vicinity ?? place.typeDescription,
       day: null,
       placeType: place.types.isNotEmpty ? place.types.first : null,
-      placeIcon: place.icon,
+      placeIcon: place.icon ?? 'google',
     );
 
     // Add to current locations
@@ -2388,6 +2387,54 @@ class MapPageContentState extends State<MapPageContent> {
                                                     ),
                                                   ),
                                                 ),
+                                                if (location.placeIcon !=
+                                                        null &&
+                                                    location
+                                                        .placeIcon!
+                                                        .isNotEmpty) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: ThemeColor.surface,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            999,
+                                                          ),
+                                                      border: Border.all(
+                                                        color:
+                                                            ThemeColor.divider,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: const [
+                                                        Icon(
+                                                          LucideIcons.mapPin,
+                                                          size: 12,
+                                                          color: ThemeColor
+                                                              .textSecondary,
+                                                        ),
+                                                        SizedBox(width: 4),
+                                                        Text(
+                                                          'Google',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: ThemeColor
+                                                                .textSecondary,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ],
                                             ),
                                             if (location.description != null &&
