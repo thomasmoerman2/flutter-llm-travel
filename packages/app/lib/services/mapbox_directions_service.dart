@@ -60,6 +60,8 @@ class LocationData {
   final double longitude;
   final String? description;
   final int? day;
+  final String? placeType; // e.g., 'restaurant', 'museum', 'hotel'
+  final String? placeIcon; // Icon name for display
 
   LocationData({
     required this.name,
@@ -67,6 +69,8 @@ class LocationData {
     required this.longitude,
     this.description,
     this.day,
+    this.placeType,
+    this.placeIcon,
   });
 
   factory LocationData.fromJson(Map<String, dynamic> json) {
@@ -80,6 +84,8 @@ class LocationData {
       longitude: _parseDouble(lngValue, 'longitude'),
       description: json['description'] as String?,
       day: json['day'] as int?,
+      placeType: json['placeType'] as String?,
+      placeIcon: json['placeIcon'] as String?,
     );
   }
 
@@ -90,6 +96,8 @@ class LocationData {
       'longitude': longitude,
       if (description != null) 'description': description,
       if (day != null) 'day': day,
+      if (placeType != null) 'placeType': placeType,
+      if (placeIcon != null) 'placeIcon': placeIcon,
     };
   }
 
@@ -235,16 +243,26 @@ class MapboxDirectionsService {
   /// Auto-detect appropriate route type based on total distance
   ///
   /// Logic:
-  /// - < 2 km: Walking
-  /// - 2-10 km: Cycling
-  /// - > 10 km: Driving
+  /// - < 5 km: Walking
+  /// - 5-20 km: Cycling
+  /// - > 20 km: Driving
+  static RouteType detectRouteTypeForDistance(double distanceKm) {
+    if (distanceKm < 5) {
+      return RouteType.walking;
+    }
+    if (distanceKm < 20) {
+      return RouteType.cycling;
+    }
+    return RouteType.driving;
+  }
+
   static RouteType detectRouteType(List<LocationData> waypoints) {
     if (waypoints.length < 2) return RouteType.walking;
 
     // Calculate total straight-line distance
     double totalDistance = 0;
     for (int i = 0; i < waypoints.length - 1; i++) {
-      totalDistance += _calculateDistance(
+      totalDistance += calculateDistance(
         waypoints[i].latitude,
         waypoints[i].longitude,
         waypoints[i + 1].latitude,
@@ -254,21 +272,26 @@ class MapboxDirectionsService {
 
     debugPrint('📏 Total distance: ${totalDistance.toStringAsFixed(1)} km');
 
-    if (totalDistance < 2) {
-      debugPrint('🚶 Auto-detected: Walking');
-      return RouteType.walking;
-    } else if (totalDistance < 10) {
-      debugPrint('🚴 Auto-detected: Cycling');
-      return RouteType.cycling;
-    } else {
-      debugPrint('🚗 Auto-detected: Driving');
-      return RouteType.driving;
+    final routeType = detectRouteTypeForDistance(totalDistance);
+
+    switch (routeType) {
+      case RouteType.walking:
+        debugPrint('🚶 Auto-detected: Walking');
+        break;
+      case RouteType.cycling:
+        debugPrint('🚴 Auto-detected: Cycling');
+        break;
+      case RouteType.driving:
+        debugPrint('🚗 Auto-detected: Driving');
+        break;
     }
+
+    return routeType;
   }
 
   /// Calculate straight-line distance between two points (Haversine formula)
   /// Returns distance in kilometers
-  static double _calculateDistance(
+  static double calculateDistance(
     double lat1,
     double lon1,
     double lat2,
@@ -291,5 +314,68 @@ class MapboxDirectionsService {
   }
 
   static double _toRadians(double degrees) => degrees * (math.pi / 180.0);
+
+  /// Optimize route by reordering waypoints to minimize total distance
+  /// Uses nearest neighbor algorithm, keeping the first waypoint as start
+  static List<LocationData> optimizeRoute(List<LocationData> waypoints) {
+    if (waypoints.length <= 2) {
+      return waypoints; // No optimization needed for 2 or fewer points
+    }
+
+    debugPrint('🔧 Optimizing route with ${waypoints.length} waypoints...');
+
+    final optimized = <LocationData>[waypoints.first]; // Start with first point
+    final remaining = List<LocationData>.from(waypoints.skip(1));
+
+    // Nearest neighbor algorithm
+    while (remaining.isNotEmpty) {
+      final current = optimized.last;
+      var nearestIndex = 0;
+      var nearestDistance = double.infinity;
+
+      // Find nearest unvisited point
+      for (var i = 0; i < remaining.length; i++) {
+        final distance = calculateDistance(
+          current.latitude,
+          current.longitude,
+          remaining[i].latitude,
+          remaining[i].longitude,
+        );
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = i;
+        }
+      }
+
+      // Add nearest point to optimized route
+      optimized.add(remaining.removeAt(nearestIndex));
+    }
+
+    // Calculate improvement
+    final originalDistance = _calculateTotalDistance(waypoints);
+    final optimizedDistance = _calculateTotalDistance(optimized);
+    final improvement = ((originalDistance - optimizedDistance) / originalDistance * 100);
+
+    debugPrint('📊 Original distance: ${originalDistance.toStringAsFixed(1)} km');
+    debugPrint('📊 Optimized distance: ${optimizedDistance.toStringAsFixed(1)} km');
+    debugPrint('✅ Route optimized! Saved ${improvement.toStringAsFixed(1)}% distance');
+
+    return optimized;
+  }
+
+  /// Calculate total distance for a route
+  static double _calculateTotalDistance(List<LocationData> waypoints) {
+    double total = 0;
+    for (int i = 0; i < waypoints.length - 1; i++) {
+      total += calculateDistance(
+        waypoints[i].latitude,
+        waypoints[i].longitude,
+        waypoints[i + 1].latitude,
+        waypoints[i + 1].longitude,
+      );
+    }
+    return total;
+  }
 
 }

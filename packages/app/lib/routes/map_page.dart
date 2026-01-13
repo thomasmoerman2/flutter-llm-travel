@@ -1052,15 +1052,20 @@ class MapPageContentState extends State<MapPageContent> {
     // Store current locations for tap handling
     _currentLocations = locations;
 
-    debugPrint('📍 Creating ${locations.length} circle markers with labels');
+    debugPrint('📍 Creating ${locations.length} numbered markers with labels');
     final circleAnnotations = <CircleAnnotationOptions>[];
     final labelAnnotations = <PointAnnotationOptions>[];
+    final numberAnnotations = <PointAnnotationOptions>[];
 
     for (var i = 0; i < locations.length; i++) {
       final location = locations[i];
+      final markerNumber = i + 1;
       debugPrint(
-        '   Creating marker $i: ${location.name} at (${location.latitude}, ${location.longitude})',
+        '   Creating marker $markerNumber: ${location.name} at (${location.latitude}, ${location.longitude})',
       );
+
+      // Get place icon/emoji based on place type
+      String placeEmoji = _getPlaceEmoji(location.placeType);
 
       // Create circle marker with custom data for tap handling
       circleAnnotations.add(
@@ -1068,25 +1073,45 @@ class MapPageContentState extends State<MapPageContent> {
           geometry: Point(
             coordinates: Position(location.longitude, location.latitude),
           ),
-          circleRadius: 12.0, // Bigger radius
+          circleRadius: 14.0, // Slightly bigger radius for number
           circleColor: ThemeColor.primary.value,
           circleStrokeColor: 0xFFFFFFFF,
           circleStrokeWidth: 3.0, // Thicker stroke
         ),
       );
 
-      // Create text label
+      // Create number text on the marker
+      numberAnnotations.add(
+        PointAnnotationOptions(
+          geometry: Point(
+            coordinates: Position(location.longitude, location.latitude),
+          ),
+          textField: '$markerNumber',
+          textSize: 14.0,
+          textColor: 0xFFFFFFFF, // White text
+          textHaloColor: ThemeColor.primary.value, // Primary color halo
+          textHaloWidth: 1.0,
+          textOffset: [0.0, 0.0], // Centered on marker
+          textAnchor: TextAnchor.CENTER,
+        ),
+      );
+
+      // Create location name label with emoji if available
+      final labelText = placeEmoji.isNotEmpty
+          ? '$placeEmoji ${location.name}'
+          : location.name;
+
       labelAnnotations.add(
         PointAnnotationOptions(
           geometry: Point(
             coordinates: Position(location.longitude, location.latitude),
           ),
-          textField: location.name,
+          textField: labelText,
           textSize: 12.0,
           textColor: 0xFF000000, // Black text
           textHaloColor: 0xFFFFFFFF, // White halo for readability
           textHaloWidth: 2.0,
-          textOffset: [0.0, -2.0], // Offset above the marker
+          textOffset: [0.0, -2.5], // Offset above the marker
           textAnchor: TextAnchor.BOTTOM,
         ),
       );
