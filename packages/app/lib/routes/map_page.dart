@@ -323,15 +323,52 @@ class MapPageContentState extends State<MapPageContent> {
         debugPrint('   [$i] ${loc.name} at (${loc.latitude}, ${loc.longitude})');
       }
 
-      // Fetch nearby places (will use time-based types)
-      // Use smaller radius for closer suggestions
-      final places = await GooglePlacesService.searchNearby(
+      // Try multiple search strategies to always find suggestions
+      List<PlaceResult> places = [];
+
+      // Strategy 1: Try 500m radius with time-based types
+      debugPrint('🔍 Strategy 1: Searching within 500m radius...');
+      places = await GooglePlacesService.searchNearby(
         latitude: centerLat,
         longitude: centerLng,
-        radius: 500, // 500m radius - much closer!
+        radius: 500,
       );
+      debugPrint('   Found ${places.length} places');
 
-      debugPrint('🟠 Google Places API returned ${places.length} places');
+      // Strategy 2: If no results, try 1000m radius
+      if (places.isEmpty) {
+        debugPrint('🔍 Strategy 2: Expanding to 1000m radius...');
+        places = await GooglePlacesService.searchNearby(
+          latitude: centerLat,
+          longitude: centerLng,
+          radius: 1000,
+        );
+        debugPrint('   Found ${places.length} places');
+      }
+
+      // Strategy 3: If still no results, try 2000m with popular places
+      if (places.isEmpty) {
+        debugPrint('🔍 Strategy 3: Searching for popular places within 2000m...');
+        places = await GooglePlacesService.searchNearby(
+          latitude: centerLat,
+          longitude: centerLng,
+          radius: 2000,
+        );
+        debugPrint('   Found ${places.length} places');
+      }
+
+      // Strategy 4: If still nothing, try 5000m radius (tourist attractions, landmarks)
+      if (places.isEmpty) {
+        debugPrint('🔍 Strategy 4: Searching for landmarks within 5000m...');
+        places = await GooglePlacesService.searchNearby(
+          latitude: centerLat,
+          longitude: centerLng,
+          radius: 5000,
+        );
+        debugPrint('   Found ${places.length} places');
+      }
+
+      debugPrint('✅ Total places found: ${places.length}');
 
       setState(() {
         _placeSuggestions = places;
@@ -347,7 +384,7 @@ class MapPageContentState extends State<MapPageContent> {
 
         debugPrint('✅ Successfully showed ${places.length} place markers');
       } else {
-        debugPrint('⚠️ No places found');
+        debugPrint('⚠️ No places found even after all strategies');
         if (!mounted) return;
         _showNoPlacesFoundDialog();
       }
@@ -754,6 +791,8 @@ class MapPageContentState extends State<MapPageContent> {
       longitude: place.longitude,
       description: place.vicinity ?? place.typeDescription,
       day: null,
+      placeType: place.types.isNotEmpty ? place.types.first : null,
+      placeIcon: place.icon,
     );
 
     // Add to current locations
@@ -1988,76 +2027,243 @@ class MapPageContentState extends State<MapPageContent> {
                           },
                           itemBuilder: (context, index) {
                             final location = reorderableLocations[index];
-                            return Container(
+                            final isLast = index == reorderableLocations.length - 1;
+
+                            // Calculate distance to next waypoint
+                            String? distanceText;
+                            String? durationText;
+                            if (!isLast && routeType != null) {
+                              final nextLocation = reorderableLocations[index + 1];
+                              final distance = MapboxDirectionsService.calculateDistance(
+                                location.latitude,
+                                location.longitude,
+                                nextLocation.latitude,
+                                nextLocation.longitude,
+                              );
+
+                              // Format distance
+                              if (distance < 1) {
+                                distanceText = '${(distance * 1000).toInt()} m';
+                              } else if (distance < 10) {
+                                distanceText = '${distance.toStringAsFixed(1)} km';
+                              } else {
+                                distanceText = '${distance.toInt()} km';
+                              }
+
+                              // Estimate duration based on route type and distance
+                              double speedKmh;
+                              switch (routeType) {
+                                case RouteType.walking:
+                                  speedKmh = 5; // 5 km/h walking
+                                  break;
+                                case RouteType.cycling:
+                                  speedKmh = 15; // 15 km/h cycling
+                                  break;
+                                case RouteType.driving:
+                                  speedKmh = 60; // 60 km/h driving (average with traffic)
+                                  break;
+                              }
+
+                              final durationHours = distance / speedKmh;
+                              final durationMin = (durationHours * 60).toInt();
+
+                              if (durationMin < 60) {
+                                durationText = '${durationMin} min';
+                              } else {
+                                final hours = durationMin ~/ 60;
+                                final mins = durationMin % 60;
+                                durationText = '${hours}h ${mins}min';
+                              }
+                            }
+
+                            return Column(
                               key: ValueKey(location.name + index.toString()),
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: ThemeColor.surface,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: ThemeColor.primary.withOpacity(
-                                        0.1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '${index + 1}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: ThemeColor.primary,
-                                        ),
-                                      ),
-                                    ),
+                              children: [
+                                // Location card
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: ThemeColor.surface,
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          location.name,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: ThemeColor.textPrimary,
-                                          ),
+                                  child: Row(
+                                    children: [
+                                      // Number badge
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: ThemeColor.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(20),
                                         ),
-                                        if (location.description != null &&
-                                            location
-                                                .description!
-                                                .isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            location.description!,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
+                                        child: Center(
+                                          child: Text(
+                                            '${index + 1}',
                                             style: const TextStyle(
-                                              fontSize: 14,
-                                              color: ThemeColor.textSecondary,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: ThemeColor.primary,
                                             ),
                                           ),
-                                        ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // Location info
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                // Place type icon
+                                                if (location.placeType != null && location.placeType!.isNotEmpty)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(right: 6),
+                                                    child: Text(
+                                                      _getPlaceEmoji(location.placeType),
+                                                      style: const TextStyle(fontSize: 16),
+                                                    ),
+                                                  ),
+                                                Expanded(
+                                                  child: Text(
+                                                    location.name,
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: ThemeColor.textPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (location.description != null &&
+                                                location.description!.isNotEmpty) ...[
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                location.description!,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: ThemeColor.textSecondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        LucideIcons.gripVertical,
+                                        size: 20,
+                                        color: ThemeColor.textSecondary,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Distance connector (timeline)
+                                if (!isLast && distanceText != null)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 20),
+                                    child: Row(
+                                      children: [
+                                        // Vertical line with icon
+                                        SizedBox(
+                                          width: 40,
+                                          height: 40,
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              // Vertical line
+                                              Positioned(
+                                                left: 19.5,
+                                                top: 0,
+                                                bottom: 0,
+                                                child: Container(
+                                                  width: 2,
+                                                  color: ThemeColor.primary.withOpacity(0.3),
+                                                ),
+                                              ),
+                                              // Arrow icon
+                                              Container(
+                                                width: 24,
+                                                height: 24,
+                                                decoration: BoxDecoration(
+                                                  color: ThemeColor.background,
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: ThemeColor.primary.withOpacity(0.3),
+                                                    width: 2,
+                                                  ),
+                                                ),
+                                                child: Icon(
+                                                  routeType == RouteType.walking
+                                                      ? LucideIcons.footprints
+                                                      : routeType == RouteType.cycling
+                                                          ? LucideIcons.bike
+                                                          : LucideIcons.car,
+                                                  size: 12,
+                                                  color: ThemeColor.primary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Distance and duration info
+                                        Expanded(
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: ThemeColor.primary.withOpacity(0.08),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  LucideIcons.moveHorizontal,
+                                                  size: 14,
+                                                  color: ThemeColor.primary,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  distanceText,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: ThemeColor.primary,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Icon(
+                                                  LucideIcons.clock,
+                                                  size: 14,
+                                                  color: ThemeColor.textSecondary,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  durationText ?? '',
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: ThemeColor.textSecondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Icon(
-                                    LucideIcons.gripVertical,
-                                    size: 20,
-                                    color: ThemeColor.textSecondary,
-                                  ),
-                                ],
-                              ),
+
+                                // Spacing
+                                if (!isLast) const SizedBox(height: 0) else const SizedBox(height: 12),
+                              ],
                             );
                           },
                         ),
