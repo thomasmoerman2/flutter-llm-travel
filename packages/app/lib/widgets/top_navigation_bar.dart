@@ -17,10 +17,7 @@ class TopNavigationBar extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _IconButton(
-              icon: LucideIcons.menu,
-              onTap: onMenuTap ?? () {},
-            ),
+            _IconButton(icon: LucideIcons.menu, onTap: onMenuTap ?? () {}),
             _IconButton(
               icon: LucideIcons.settings,
               onTap: onSettingsTap ?? () {},
@@ -48,7 +45,7 @@ class _IconButton extends StatelessWidget {
           color: ThemeColor.surface,
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Icon(icon, color: ThemeColor.iconDefault, size: 24),
+        child: Icon(icon, color: ThemeColor.textPrimary, size: 24),
       ),
     );
   }

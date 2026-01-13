@@ -32,7 +32,9 @@ class ChatMessageBubble extends StatelessWidget {
     final mapActionLabel = message.hasRoute ? 'Show route' : 'Show on map';
 
     if (!isUser) {
-      debugPrint('🎨 ChatMessageBubble: isUser=$isUser, hasError=${message.hasError}, hasLocations=${message.hasLocations}, hasRoute=${message.hasRoute}, showMapAction=$showMapAction');
+      debugPrint(
+        '🎨 ChatMessageBubble: isUser=$isUser, hasError=${message.hasError}, hasLocations=${message.hasLocations}, hasRoute=${message.hasRoute}, showMapAction=$showMapAction',
+      );
       if (message.metadata != null) {
         debugPrint('   Metadata keys: ${message.metadata!.keys.join(", ")}');
       }
@@ -54,8 +56,10 @@ class ChatMessageBubble extends StatelessWidget {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: message.hasError
                       ? (isUser
@@ -77,211 +81,193 @@ class ChatMessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  // Model header for AI messages
-                  if (!isUser && showModel) ...[
-                    Row(
-                      children: [
-                        Icon(
-                          _getModelIcon(message.model),
-                          size: 14,
-                          color: ThemeColor.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          message.model,
-                          style: const TextStyle(
-                            fontSize: 12,
+                    // Model header for AI messages
+                    if (!isUser && showModel) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            _getModelIcon(message.model),
+                            size: 14,
                             color: ThemeColor.textSecondary,
-                            fontWeight: FontWeight.w500,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Message content
-                  MarkdownBody(
-                    data: message.content,
-                    styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(
-                        fontSize: 16,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                        height: 1.4,
-                      ),
-                      strong: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                      ),
-                      em: TextStyle(
-                        fontSize: 16,
-                        fontStyle: FontStyle.italic,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                      ),
-                      code: TextStyle(
-                        fontSize: 14,
-                        fontFamily: 'monospace',
-                        backgroundColor: isUser
-                            ? ThemeColor.background.withOpacity(0.2)
-                            : ThemeColor.surface,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: isUser
-                            ? ThemeColor.background.withOpacity(0.2)
-                            : ThemeColor.surface,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      blockquote: TextStyle(
-                        fontSize: 16,
-                        color: isUser
-                            ? ThemeColor.background.withOpacity(0.8)
-                            : ThemeColor.textSecondary,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      h1: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                      ),
-                      h2: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                      ),
-                      h3: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                      ),
-                      listBullet: TextStyle(
-                        fontSize: 16,
-                        color: isUser
-                            ? ThemeColor.background
-                            : ThemeColor.textPrimary,
-                      ),
-                    ),
-                    selectable: true,
-                  ),
-
-                  // Route details (for AI messages with route information)
-                  if (!isUser && message.hasRoute && message.metadata != null)
-                    ..._buildRouteDetails(),
-
-                  // Show on Map button (for AI messages with locations/routes)
-                  if (showMapAction && onShowOnMap != null) ...[
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: onShowOnMap,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: ThemeColor.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              LucideIcons.map,
-                              size: 16,
-                              color: ThemeColor.background,
+                          const SizedBox(width: 6),
+                          Text(
+                            message.model,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: ThemeColor.textSecondary,
+                              fontWeight: FontWeight.w500,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              mapActionLabel,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: ThemeColor.background,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                    ],
 
-                  // Status indicators
-                  if ((message.isStreaming || message.isSending) &&
-                      !message.hasError) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CupertinoActivityIndicator(
-                            color: isUser
-                                ? ThemeColor.background
-                                : ThemeColor.textSecondary,
-                            radius: 6,
-                          ),
+                    // Message content
+                    MarkdownBody(
+                      data: message.content,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          fontSize: 16,
+                          color: ThemeColor.textPrimary,
+                          height: 1.4,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          message.isStreaming ? 'Typing...' : 'Sending...',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isUser
-                                ? ThemeColor.background.withOpacity(0.8)
-                                : ThemeColor.textSecondary,
-                          ),
+                        strong: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: ThemeColor.textPrimary,
                         ),
-                      ],
-                    ),
-                  ],
-
-                  // Error indicator
-                  if (message.hasError) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          LucideIcons.circleAlert,
-                          size: 14,
+                        em: TextStyle(
+                          fontSize: 16,
+                          fontStyle: FontStyle.italic,
+                          color: ThemeColor.textPrimary,
+                        ),
+                        code: TextStyle(
+                          fontSize: 14,
+                          fontFamily: 'monospace',
+                          backgroundColor: isUser
+                              ? ThemeColor.background.withOpacity(0.2)
+                              : ThemeColor.surface,
+                          color: ThemeColor.textPrimary,
+                        ),
+                        codeblockDecoration: BoxDecoration(
                           color: isUser
-                              ? ThemeColor.background
-                              : const Color(
-                                  0xFFEF5350,
-                                ), // Red color for error icon
+                              ? ThemeColor.background.withOpacity(0.2)
+                              : ThemeColor.surface,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Error',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        blockquote: TextStyle(
+                          fontSize: 16,
+                          color: ThemeColor.textSecondary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        h1: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: ThemeColor.textPrimary,
+                        ),
+                        h2: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: ThemeColor.textPrimary,
+                        ),
+                        h3: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: ThemeColor.textPrimary,
+                        ),
+                        listBullet: TextStyle(
+                          fontSize: 16,
+                          color: ThemeColor.textPrimary,
+                        ),
+                      ),
+                      selectable: true,
+                    ),
+
+                    // Route details (for AI messages with route information)
+                    if (!isUser && message.hasRoute && message.metadata != null)
+                      ..._buildRouteDetails(),
+
+                    // Show on Map button (for AI messages with locations/routes)
+                    if (showMapAction && onShowOnMap != null) ...[
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: onShowOnMap,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ThemeColor.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.map,
+                                size: 16,
+                                color: ThemeColor.textPrimary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                mapActionLabel,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: ThemeColor.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // Status indicators
+                    if ((message.isStreaming || message.isSending) &&
+                        !message.hasError) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CupertinoActivityIndicator(
+                              color: isUser
+                                  ? ThemeColor.textPrimary
+                                  : ThemeColor.textSecondary,
+                              radius: 6,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            message.isStreaming ? 'Typing...' : 'Sending...',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isUser
+                                  ? ThemeColor.textPrimary.withOpacity(0.8)
+                                  : ThemeColor.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    // Error indicator
+                    if (message.hasError) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            LucideIcons.circleAlert,
+                            size: 14,
                             color: isUser
-                                ? ThemeColor.background.withOpacity(0.8)
+                                ? ThemeColor.textPrimary
                                 : const Color(
                                     0xFFEF5350,
-                                  ), // Red color for error text
+                                  ), // Red color for error icon
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(width: 6),
+                          Text(
+                            'Error',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isUser
+                                  ? ThemeColor.textPrimary.withOpacity(0.8)
+                                  : const Color(
+                                      0xFFEF5350,
+                                    ), // Red color for error text
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
 
                     // Timestamp
                     const SizedBox(height: 4),
@@ -290,8 +276,8 @@ class ChatMessageBubble extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         color: isUser
-                            ? ThemeColor.background.withOpacity(0.7)
-                            : ThemeColor.textSecondary.withOpacity(0.7),
+                            ? ThemeColor.textPrimary.withOpacity(0.7)
+                            : ThemeColor.textSecondary.withOpacity(0.9),
                       ),
                     ),
                   ],
@@ -440,10 +426,7 @@ class ChatMessageBubble extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Text(
-                    transportEmoji,
-                    style: const TextStyle(fontSize: 16),
-                  ),
+                  Text(transportEmoji, style: const TextStyle(fontSize: 16)),
                   const SizedBox(width: 6),
                   Text(
                     'Best by $transportMode',
@@ -492,7 +475,7 @@ class ChatMessageBubble extends StatelessWidget {
       child: Icon(
         isUser ? LucideIcons.user : _getModelIcon(message.model),
         size: 16,
-        color: isUser ? ThemeColor.background : ThemeColor.textPrimary,
+        color: ThemeColor.textPrimary,
       ),
     );
   }

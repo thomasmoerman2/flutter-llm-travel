@@ -19,7 +19,7 @@ import '../widgets/chat_message_bubble.dart';
 class HomePageContent extends StatefulWidget {
   final String? initialModel;
   final void Function(List<LocationData> locations, RouteType? routeType)?
-      onShowOnMap;
+  onShowOnMap;
 
   const HomePageContent({super.key, this.initialModel, this.onShowOnMap});
 
@@ -437,7 +437,9 @@ class HomePageContentState extends State<HomePageContent>
     }
 
     for (var i = 0; i < locations.length; i++) {
-      debugPrint('   Location $i: ${locations[i].name} (${locations[i].latitude}, ${locations[i].longitude})');
+      debugPrint(
+        '   Location $i: ${locations[i].name} (${locations[i].latitude}, ${locations[i].longitude})',
+      );
     }
 
     final routeType = _extractRouteType(message);
@@ -513,7 +515,8 @@ class HomePageContentState extends State<HomePageContent>
                         showModel:
                             index == 0 ||
                             message.model != _messages[index - 1].model,
-                        onShowOnMap: (!message.isUser &&
+                        onShowOnMap:
+                            (!message.isUser &&
                                 (message.hasLocations || message.hasRoute))
                             ? () => _handleShowOnMap(message)
                             : null,
@@ -563,7 +566,9 @@ class HomePageContentState extends State<HomePageContent>
                           color: ThemeColor.textSecondary,
                         ),
                       ),
-                      if (!_isApiAvailable && !_isCheckingApi && _isRestModel(_currentModel)) ...[
+                      if (!_isApiAvailable &&
+                          !_isCheckingApi &&
+                          _isRestModel(_currentModel)) ...[
                         const SizedBox(width: 6),
                         const Icon(
                           LucideIcons.wifiOff,
@@ -573,7 +578,9 @@ class HomePageContentState extends State<HomePageContent>
                       ],
                     ],
                   ),
-                  if (!_isApiAvailable && !_isCheckingApi && _isRestModel(_currentModel)) ...[
+                  if (!_isApiAvailable &&
+                      !_isCheckingApi &&
+                      _isRestModel(_currentModel)) ...[
                     const SizedBox(height: 6),
                     GestureDetector(
                       onTap: _checkApiAvailability,
@@ -604,7 +611,8 @@ class HomePageContentState extends State<HomePageContent>
                       Expanded(
                         child: CupertinoTextField(
                           controller: _textController,
-                          placeholder: (!_isApiAvailable && _isRestModel(_currentModel))
+                          placeholder:
+                              (!_isApiAvailable && _isRestModel(_currentModel))
                               ? 'API unavailable'
                               : 'home.input_placeholder'.tr(),
                           maxLines: null,
@@ -616,7 +624,9 @@ class HomePageContentState extends State<HomePageContent>
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: (!_isApiAvailable && _isRestModel(_currentModel))
+                            color:
+                                (!_isApiAvailable &&
+                                    _isRestModel(_currentModel))
                                 ? ThemeColor.inputBackground.withOpacity(0.5)
                                 : ThemeColor.inputBackground,
                             borderRadius: BorderRadius.circular(24),
@@ -625,7 +635,9 @@ class HomePageContentState extends State<HomePageContent>
                       ),
                       const SizedBox(width: 12),
                       GestureDetector(
-                        onTap: (_isSending || !_isApiAvailable) ? null : _handleSend,
+                        onTap: (_isSending || !_isApiAvailable)
+                            ? null
+                            : _handleSend,
                         child: Container(
                           width: 48,
                           height: 48,
@@ -642,11 +654,12 @@ class HomePageContentState extends State<HomePageContent>
                                   ),
                                 )
                               : Icon(
-                                  !_isApiAvailable && _isRestModel(_currentModel)
+                                  !_isApiAvailable &&
+                                          _isRestModel(_currentModel)
                                       ? LucideIcons.wifiOff
                                       : LucideIcons.send,
                                   size: 20,
-                                  color: ThemeColor.background,
+                                  color: ThemeColor.textPrimary,
                                 ),
                         ),
                       ),
