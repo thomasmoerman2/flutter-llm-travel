@@ -320,7 +320,9 @@ class MapPageContentState extends State<MapPageContent> {
       debugPrint('   Route has ${_currentLocations.length} locations:');
       for (var i = 0; i < _currentLocations.length; i++) {
         final loc = _currentLocations[i];
-        debugPrint('   [$i] ${loc.name} at (${loc.latitude}, ${loc.longitude})');
+        debugPrint(
+          '   [$i] ${loc.name} at (${loc.latitude}, ${loc.longitude})',
+        );
       }
 
       // Try multiple search strategies to always find suggestions
@@ -348,7 +350,9 @@ class MapPageContentState extends State<MapPageContent> {
 
       // Strategy 3: If still no results, try 2000m with popular places
       if (places.isEmpty) {
-        debugPrint('🔍 Strategy 3: Searching for popular places within 2000m...');
+        debugPrint(
+          '🔍 Strategy 3: Searching for popular places within 2000m...',
+        );
         places = await GooglePlacesService.searchNearby(
           latitude: centerLat,
           longitude: centerLng,
@@ -426,7 +430,9 @@ class MapPageContentState extends State<MapPageContent> {
 
     for (var i = 0; i < places.length; i++) {
       final place = places[i];
-      debugPrint('   [$i] ${place.name} at (${place.latitude}, ${place.longitude})');
+      debugPrint(
+        '   [$i] ${place.name} at (${place.latitude}, ${place.longitude})',
+      );
 
       try {
         final annotation = PointAnnotationOptions(
@@ -447,7 +453,9 @@ class MapPageContentState extends State<MapPageContent> {
 
     debugPrint('🟠 Total annotations to create: ${annotations.length}');
 
-    final createdAnnotations = await _placesAnnotationManager!.createMulti(annotations);
+    final createdAnnotations = await _placesAnnotationManager!.createMulti(
+      annotations,
+    );
     debugPrint('✅ Created ${createdAnnotations.length} point annotations');
 
     if (createdAnnotations.isEmpty && places.isNotEmpty) {
@@ -475,17 +483,23 @@ class MapPageContentState extends State<MapPageContent> {
         );
       }
 
-      final createdCircles = await _placesCircleManager!.createMulti(circleAnnotations);
+      final createdCircles = await _placesCircleManager!.createMulti(
+        circleAnnotations,
+      );
       debugPrint('✅ Created ${createdCircles.length} orange circle markers');
     }
 
     // Verify markers are still there after creation
     await Future.delayed(const Duration(milliseconds: 100));
     final allAnnotations = await _placesAnnotationManager!.getAnnotations();
-    debugPrint('🔍 Verification: ${allAnnotations.length} point markers exist after creation');
+    debugPrint(
+      '🔍 Verification: ${allAnnotations.length} point markers exist after creation',
+    );
 
     if (allAnnotations.isEmpty && createdAnnotations.isNotEmpty) {
-      debugPrint('🚨 CRITICAL: Point markers were created but disappeared immediately!');
+      debugPrint(
+        '🚨 CRITICAL: Point markers were created but disappeared immediately!',
+      );
     }
 
     // Add tap listener for place markers
@@ -704,9 +718,13 @@ class MapPageContentState extends State<MapPageContent> {
                                 _goToPlace(place);
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: ThemeColor.textSecondary.withOpacity(0.1),
+                                  color: ThemeColor.textSecondary.withOpacity(
+                                    0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Row(
@@ -742,7 +760,9 @@ class MapPageContentState extends State<MapPageContent> {
                                 _addPlaceToRoute(place);
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFF6B35),
                                   borderRadius: BorderRadius.circular(12),
@@ -796,9 +816,19 @@ class MapPageContentState extends State<MapPageContent> {
     );
 
     // Add to current locations
-    final updatedLocations = [..._currentLocations, newLocation];
+    var updatedLocations = [..._currentLocations, newLocation];
 
-    debugPrint('✅ Added ${place.name} to route (${updatedLocations.length} total locations)');
+    debugPrint(
+      '✅ Added ${place.name} to route (${updatedLocations.length} total locations)',
+    );
+
+    // Auto-optimize route if we have 3+ locations
+    if (updatedLocations.length >= 3) {
+      debugPrint('🔧 Auto-optimizing route...');
+      updatedLocations = MapboxDirectionsService.optimizeRoute(
+        updatedLocations,
+      );
+    }
 
     // Show the updated route on the map
     if (updatedLocations.length >= 2) {
@@ -810,12 +840,15 @@ class MapPageContentState extends State<MapPageContent> {
     }
 
     // Show confirmation
+    final wasOptimized = updatedLocations.length >= 3;
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('Added to Route'),
         content: Text(
-          '${place.name} has been added to your route with ${updatedLocations.length} ${updatedLocations.length == 1 ? 'location' : 'locations'}.',
+          wasOptimized
+              ? '${place.name} has been added and your route with ${updatedLocations.length} locations has been optimized for the shortest distance!'
+              : '${place.name} has been added to your route with ${updatedLocations.length} ${updatedLocations.length == 1 ? 'location' : 'locations'}.',
         ),
         actions: [
           CupertinoDialogAction(
@@ -835,9 +868,7 @@ class MapPageContentState extends State<MapPageContent> {
       final place = places.first;
       await _mapboxMap!.flyTo(
         CameraOptions(
-          center: Point(
-            coordinates: Position(place.longitude, place.latitude),
-          ),
+          center: Point(coordinates: Position(place.longitude, place.latitude)),
           zoom: 15,
         ),
         MapAnimationOptions(duration: 800),
@@ -896,9 +927,7 @@ class MapPageContentState extends State<MapPageContent> {
     if (_mapboxMap != null) {
       _mapboxMap!.flyTo(
         CameraOptions(
-          center: Point(
-            coordinates: Position(place.longitude, place.latitude),
-          ),
+          center: Point(coordinates: Position(place.longitude, place.latitude)),
           zoom: 16,
         ),
         MapAnimationOptions(duration: 600),
@@ -907,7 +936,9 @@ class MapPageContentState extends State<MapPageContent> {
   }
 
   void _showNoPlacesFoundDialog() {
-    final timeDesc = GooglePlacesService.getPlaceTypeDescription(DateTime.now());
+    final timeDesc = GooglePlacesService.getPlaceTypeDescription(
+      DateTime.now(),
+    );
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -1123,6 +1154,9 @@ class MapPageContentState extends State<MapPageContent> {
     final createdLabels = await _labelAnnotationManager!.createMulti(
       labelAnnotations,
     );
+    final createdNumbers = await _labelAnnotationManager!.createMulti(
+      numberAnnotations,
+    );
 
     // Add tap listener for circles
     _circleAnnotationManager!.addOnCircleAnnotationClickListener(
@@ -1144,8 +1178,46 @@ class MapPageContentState extends State<MapPageContent> {
     );
 
     debugPrint(
-      '✅ Successfully created ${createdCircles.length} markers and ${createdLabels.length} labels on map',
+      '✅ Successfully created ${createdCircles.length} markers, ${createdNumbers.length} numbers, and ${createdLabels.length} labels on map',
     );
+  }
+
+  /// Get emoji icon based on place type
+  String _getPlaceEmoji(String? placeType) {
+    if (placeType == null || placeType.isEmpty) return '';
+
+    final type = placeType.toLowerCase();
+
+    // Common place type mappings to emojis
+    if (type.contains('restaurant') || type.contains('food')) return '🍽️';
+    if (type.contains('cafe') || type.contains('coffee')) return '☕';
+    if (type.contains('bar') || type.contains('night_club')) return '🍺';
+    if (type.contains('hotel') || type.contains('lodging')) return '🏨';
+    if (type.contains('museum')) return '🏛️';
+    if (type.contains('park')) return '🌳';
+    if (type.contains('shopping') || type.contains('store')) return '🛍️';
+    if (type.contains('gym') || type.contains('stadium')) return '⚽';
+    if (type.contains('hospital') || type.contains('doctor')) return '🏥';
+    if (type.contains('pharmacy')) return '💊';
+    if (type.contains('bank') || type.contains('atm')) return '🏦';
+    if (type.contains('airport')) return '✈️';
+    if (type.contains('train') || type.contains('subway')) return '🚆';
+    if (type.contains('bus')) return '🚌';
+    if (type.contains('church') ||
+        type.contains('mosque') ||
+        type.contains('temple'))
+      return '⛪';
+    if (type.contains('school') || type.contains('university')) return '🎓';
+    if (type.contains('library')) return '📚';
+    if (type.contains('movie') || type.contains('theater')) return '🎭';
+    if (type.contains('spa') || type.contains('beauty')) return '💆';
+    if (type.contains('gas_station') || type.contains('fuel')) return '⛽';
+    if (type.contains('parking')) return '🅿️';
+    if (type.contains('beach')) return '🏖️';
+    if (type.contains('mountain')) return '⛰️';
+    if (type.contains('tourist')) return '📸';
+
+    return '📍'; // Default location pin
   }
 
   void _showLocationDetails(LocationData location) {
@@ -1976,14 +2048,12 @@ class MapPageContentState extends State<MapPageContent> {
     RouteType? routeType, {
     Function(List<LocationData>, RouteType?)? onRouteUpdated,
   }) {
+    final reorderableLocations = List<LocationData>.from(locations);
     showCupertinoModalPopup(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Make a mutable copy for reordering
-            final reorderableLocations = List<LocationData>.from(locations);
-
             return Container(
               height: MediaQuery.of(context).size.height * 0.7,
               decoration: const BoxDecoration(
@@ -2034,7 +2104,7 @@ class MapPageContentState extends State<MapPageContent> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Reorderable Locations list
+                      // Reorderable Locations list with timeline
                       Expanded(
                         child: ReorderableListView.builder(
                           itemCount: reorderableLocations.length,
@@ -2052,32 +2122,42 @@ class MapPageContentState extends State<MapPageContent> {
                           },
                           itemBuilder: (context, index) {
                             final location = reorderableLocations[index];
-                            final isLast = index == reorderableLocations.length - 1;
+                            final isLast =
+                                index == reorderableLocations.length - 1;
 
                             // Calculate distance to next waypoint
                             String? distanceText;
                             String? durationText;
+                            RouteType? segmentRouteType;
                             if (!isLast && routeType != null) {
-                              final nextLocation = reorderableLocations[index + 1];
-                              final distance = MapboxDirectionsService.calculateDistance(
-                                location.latitude,
-                                location.longitude,
-                                nextLocation.latitude,
-                                nextLocation.longitude,
-                              );
+                              final nextLocation =
+                                  reorderableLocations[index + 1];
+                              final distance =
+                                  MapboxDirectionsService.calculateDistance(
+                                    location.latitude,
+                                    location.longitude,
+                                    nextLocation.latitude,
+                                    nextLocation.longitude,
+                                  );
+                              final resolvedSegmentRouteType =
+                                  MapboxDirectionsService.detectRouteTypeForDistance(
+                                    distance,
+                                  );
+                              segmentRouteType = resolvedSegmentRouteType;
 
                               // Format distance
                               if (distance < 1) {
                                 distanceText = '${(distance * 1000).toInt()} m';
                               } else if (distance < 10) {
-                                distanceText = '${distance.toStringAsFixed(1)} km';
+                                distanceText =
+                                    '${distance.toStringAsFixed(1)} km';
                               } else {
                                 distanceText = '${distance.toInt()} km';
                               }
 
                               // Estimate duration based on route type and distance
                               double speedKmh;
-                              switch (routeType) {
+                              switch (resolvedSegmentRouteType) {
                                 case RouteType.walking:
                                   speedKmh = 5; // 5 km/h walking
                                   break;
@@ -2085,7 +2165,8 @@ class MapPageContentState extends State<MapPageContent> {
                                   speedKmh = 15; // 15 km/h cycling
                                   break;
                                 case RouteType.driving:
-                                  speedKmh = 60; // 60 km/h driving (average with traffic)
+                                  speedKmh =
+                                      60; // 60 km/h driving (average with traffic)
                                   break;
                               }
 
@@ -2118,8 +2199,12 @@ class MapPageContentState extends State<MapPageContent> {
                                         width: 40,
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: ThemeColor.primary.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(20),
+                                          color: ThemeColor.primary.withOpacity(
+                                            0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                         ),
                                         child: Center(
                                           child: Text(
@@ -2136,17 +2221,29 @@ class MapPageContentState extends State<MapPageContent> {
                                       // Location info
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Row(
                                               children: [
                                                 // Place type icon
-                                                if (location.placeType != null && location.placeType!.isNotEmpty)
+                                                if (location.placeType !=
+                                                        null &&
+                                                    location
+                                                        .placeType!
+                                                        .isNotEmpty)
                                                   Padding(
-                                                    padding: const EdgeInsets.only(right: 6),
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          right: 6,
+                                                        ),
                                                     child: Text(
-                                                      _getPlaceEmoji(location.placeType),
-                                                      style: const TextStyle(fontSize: 16),
+                                                      _getPlaceEmoji(
+                                                        location.placeType,
+                                                      ),
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                      ),
                                                     ),
                                                   ),
                                                 Expanded(
@@ -2154,15 +2251,19 @@ class MapPageContentState extends State<MapPageContent> {
                                                     location.name,
                                                     style: const TextStyle(
                                                       fontSize: 16,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: ThemeColor.textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: ThemeColor
+                                                          .textPrimary,
                                                     ),
                                                   ),
                                                 ),
                                               ],
                                             ),
                                             if (location.description != null &&
-                                                location.description!.isNotEmpty) ...[
+                                                location
+                                                    .description!
+                                                    .isNotEmpty) ...[
                                               const SizedBox(height: 4),
                                               Text(
                                                 location.description!,
@@ -2170,7 +2271,8 @@ class MapPageContentState extends State<MapPageContent> {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
                                                   fontSize: 14,
-                                                  color: ThemeColor.textSecondary,
+                                                  color:
+                                                      ThemeColor.textSecondary,
                                                 ),
                                               ),
                                             ],
@@ -2207,7 +2309,8 @@ class MapPageContentState extends State<MapPageContent> {
                                                 bottom: 0,
                                                 child: Container(
                                                   width: 2,
-                                                  color: ThemeColor.primary.withOpacity(0.3),
+                                                  color: ThemeColor.primary
+                                                      .withOpacity(0.3),
                                                 ),
                                               ),
                                               // Arrow icon
@@ -2218,16 +2321,21 @@ class MapPageContentState extends State<MapPageContent> {
                                                   color: ThemeColor.background,
                                                   shape: BoxShape.circle,
                                                   border: Border.all(
-                                                    color: ThemeColor.primary.withOpacity(0.3),
+                                                    color: ThemeColor.primary
+                                                        .withOpacity(0.3),
                                                     width: 2,
                                                   ),
                                                 ),
                                                 child: Icon(
-                                                  routeType == RouteType.walking
+                                                  (segmentRouteType ??
+                                                              routeType) ==
+                                                          RouteType.walking
                                                       ? LucideIcons.footprints
-                                                      : routeType == RouteType.cycling
-                                                          ? LucideIcons.bike
-                                                          : LucideIcons.car,
+                                                      : (segmentRouteType ??
+                                                                routeType) ==
+                                                            RouteType.cycling
+                                                      ? LucideIcons.bike
+                                                      : LucideIcons.car,
                                                   size: 12,
                                                   color: ThemeColor.primary,
                                                 ),
@@ -2244,8 +2352,10 @@ class MapPageContentState extends State<MapPageContent> {
                                               vertical: 6,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: ThemeColor.primary.withOpacity(0.08),
-                                              borderRadius: BorderRadius.circular(8),
+                                              color: ThemeColor.primary
+                                                  .withOpacity(0.08),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
@@ -2268,14 +2378,16 @@ class MapPageContentState extends State<MapPageContent> {
                                                 Icon(
                                                   LucideIcons.clock,
                                                   size: 14,
-                                                  color: ThemeColor.textSecondary,
+                                                  color:
+                                                      ThemeColor.textSecondary,
                                                 ),
                                                 const SizedBox(width: 6),
                                                 Text(
                                                   durationText ?? '',
                                                   style: const TextStyle(
                                                     fontSize: 13,
-                                                    color: ThemeColor.textSecondary,
+                                                    color: ThemeColor
+                                                        .textSecondary,
                                                   ),
                                                 ),
                                               ],
@@ -2287,7 +2399,10 @@ class MapPageContentState extends State<MapPageContent> {
                                   ),
 
                                 // Spacing
-                                if (!isLast) const SizedBox(height: 0) else const SizedBox(height: 12),
+                                if (!isLast)
+                                  const SizedBox(height: 0)
+                                else
+                                  const SizedBox(height: 12),
                               ],
                             );
                           },
