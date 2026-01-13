@@ -7,6 +7,7 @@ import 'ai/ai_service_factory.dart';
 import 'firestore_access.dart';
 import 'location_parser.dart';
 import 'offline_storage_service.dart';
+import 'mapbox_directions_service.dart';
 
 /// Service to manage chat conversations and AI interactions
 class ChatService {
@@ -214,8 +215,43 @@ class ChatService {
         responseMetadata['locations'] =
             parsed.locations.map((location) => location.toJson()).toList();
         debugPrint('✅ Added locations to metadata');
+
+        // Calculate route details if we have multiple locations
+        if (parsed.locations.length >= 2) {
+          try {
+            // Auto-detect or use specified route type
+            final routeType = parsed.routeType ??
+                MapboxDirectionsService.detectRouteType(parsed.locations);
+
+            debugPrint('📏 Calculating route details with ${routeType.displayName}...');
+            final routeInfo = await MapboxDirectionsService.calculateRoute(
+              waypoints: parsed.locations,
+              routeType: routeType,
+            );
+
+            // Add route details to metadata
+            responseMetadata['routeType'] = routeType.name;
+            responseMetadata['distance'] = routeInfo.distance; // meters
+            responseMetadata['distanceKm'] = routeInfo.distanceKm;
+            responseMetadata['distanceFormatted'] = routeInfo.distanceFormatted;
+            responseMetadata['duration'] = routeInfo.duration; // seconds
+            responseMetadata['durationMin'] = routeInfo.durationMin;
+            responseMetadata['durationFormatted'] = routeInfo.durationFormatted;
+            responseMetadata['transportMode'] = routeType.displayName;
+            responseMetadata['transportEmoji'] = routeType.emoji;
+
+            debugPrint('✅ Route details calculated: ${routeInfo.distanceFormatted}, ${routeInfo.durationFormatted}');
+          } catch (e) {
+            debugPrint('⚠️ Could not calculate route details: $e');
+            // Still save routeType if it was detected
+            if (parsed.routeType != null) {
+              responseMetadata['routeType'] = parsed.routeType!.name;
+            }
+          }
+        }
       }
-      if (parsed.routeType != null) {
+      if (parsed.routeType != null && parsed.locations.length < 2) {
+        // Single location but route type was mentioned - just save the type
         responseMetadata['routeType'] = parsed.routeType!.name;
         debugPrint('✅ Added routeType to metadata');
       }

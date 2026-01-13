@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../models/chat_message.dart';
 import '../services/theme_color.dart';
 
@@ -99,16 +101,87 @@ class ChatMessageBubble extends StatelessWidget {
                   ],
 
                   // Message content
-                  Text(
-                    message.content,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isUser
-                          ? ThemeColor.background
-                          : ThemeColor.textPrimary,
-                      height: 1.4,
+                  MarkdownBody(
+                    data: message.content,
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(
+                        fontSize: 16,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                        height: 1.4,
+                      ),
+                      strong: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                      ),
+                      em: TextStyle(
+                        fontSize: 16,
+                        fontStyle: FontStyle.italic,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                      ),
+                      code: TextStyle(
+                        fontSize: 14,
+                        fontFamily: 'monospace',
+                        backgroundColor: isUser
+                            ? ThemeColor.background.withOpacity(0.2)
+                            : ThemeColor.surface,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                      ),
+                      codeblockDecoration: BoxDecoration(
+                        color: isUser
+                            ? ThemeColor.background.withOpacity(0.2)
+                            : ThemeColor.surface,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      blockquote: TextStyle(
+                        fontSize: 16,
+                        color: isUser
+                            ? ThemeColor.background.withOpacity(0.8)
+                            : ThemeColor.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      h1: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                      ),
+                      h2: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                      ),
+                      h3: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                      ),
+                      listBullet: TextStyle(
+                        fontSize: 16,
+                        color: isUser
+                            ? ThemeColor.background
+                            : ThemeColor.textPrimary,
+                      ),
                     ),
+                    selectable: true,
                   ),
+
+                  // Route details (for AI messages with route information)
+                  if (!isUser && message.hasRoute && message.metadata != null)
+                    ..._buildRouteDetails(),
 
                   // Show on Map button (for AI messages with locations/routes)
                   if (showMapAction && onShowOnMap != null) ...[
@@ -266,6 +339,127 @@ class ChatMessageBubble extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildRouteDetails() {
+    final metadata = message.metadata!;
+    final distanceFormatted = metadata['distanceFormatted'] as String?;
+    final durationFormatted = metadata['durationFormatted'] as String?;
+    final transportMode = metadata['transportMode'] as String?;
+    final transportEmoji = metadata['transportEmoji'] as String?;
+
+    // Don't show if we don't have the essential info
+    if (distanceFormatted == null || durationFormatted == null) {
+      return [];
+    }
+
+    return [
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: ThemeColor.background.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.route,
+                  size: 14,
+                  color: ThemeColor.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Route Details',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: ThemeColor.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Details
+            Row(
+              children: [
+                // Distance
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        LucideIcons.moveHorizontal,
+                        size: 16,
+                        color: ThemeColor.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          distanceFormatted,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: ThemeColor.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Duration
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        LucideIcons.clock,
+                        size: 16,
+                        color: ThemeColor.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          durationFormatted,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: ThemeColor.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            // Transportation mode
+            if (transportMode != null && transportEmoji != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    transportEmoji,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Best by $transportMode',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: ThemeColor.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    ];
   }
 
   String _formatTimestamp(DateTime timestamp) {
