@@ -766,9 +766,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                         vertical: 12,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: ThemeColor.primary.withOpacity(
-                                          0.1,
-                                        ),
+                                        color: ThemeColor.primary,
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: _isDownloadingData
@@ -785,7 +783,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                                   style: TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w500,
-                                                    color: ThemeColor.primary,
+                                                    color:
+                                                        ThemeColor.textPrimary,
                                                   ),
                                                 ),
                                               ],
@@ -797,7 +796,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                                 Icon(
                                                   LucideIcons.download,
                                                   size: 16,
-                                                  color: ThemeColor.primary,
+                                                  color: ThemeColor.textPrimary,
                                                 ),
                                                 SizedBox(width: 6),
                                                 Text(
@@ -805,7 +804,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                                   style: TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w500,
-                                                    color: ThemeColor.primary,
+                                                    color:
+                                                        ThemeColor.textPrimary,
                                                   ),
                                                 ),
                                               ],
@@ -1016,7 +1016,7 @@ class _AccountFieldWithSave extends StatelessWidget {
                   : const Icon(
                       LucideIcons.check,
                       size: 20,
-                      color: ThemeColor.primary,
+                      color: ThemeColor.textPrimary,
                     ),
             ),
           ),

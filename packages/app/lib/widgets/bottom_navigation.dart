@@ -67,7 +67,8 @@ class BottomNavigation extends StatelessWidget {
                     right: onMapActionTap != null ? 12 : 0,
                   ),
                   decoration: BoxDecoration(
-                    color: ThemeColor.primary,
+                    color: ThemeColor.surface,
+                    border: Border.all(color: ThemeColor.textPrimary, width: 1),
                     borderRadius: BorderRadius.circular(26),
                     boxShadow: const [
                       BoxShadow(
@@ -80,7 +81,7 @@ class BottomNavigation extends StatelessWidget {
                   child: const Icon(
                     LucideIcons.mapPinned,
                     size: 22,
-                    color: ThemeColor.background,
+                    color: ThemeColor.textPrimary,
                   ),
                 ),
               ),
@@ -107,7 +108,7 @@ class BottomNavigation extends StatelessWidget {
                   child: const Icon(
                     LucideIcons.list,
                     size: 22,
-                    color: ThemeColor.background,
+                    color: ThemeColor.textPrimary,
                   ),
                 ),
               ),
@@ -136,10 +137,10 @@ class _NavButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isActive ? ThemeColor.divider : ThemeColor.transparent,
+          color: isActive ? ThemeColor.primary : ThemeColor.transparent,
           borderRadius: BorderRadius.circular(24),
         ),
-        child: Icon(icon, color: ThemeColor.iconDefault, size: 24),
+        child: Icon(icon, color: ThemeColor.textPrimary, size: 24),
       ),
     );
   }

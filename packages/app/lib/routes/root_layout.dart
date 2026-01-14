@@ -171,7 +171,17 @@ class _RootLayoutState extends State<RootLayout> {
           key: _homePageKey,
           onShowOnMap: _showLocationsOnMap,
         ),
-        MapPageContent(key: _mapPageKey, bottomInset: mapBottomInset),
+        MapPageContent(
+          key: _mapPageKey,
+          bottomInset: mapBottomInset,
+          onRouteDisplayed: (locations, routeType) {
+            if (!mounted) return;
+            setState(() {
+              _displayedLocations = locations;
+              _displayedRouteType = routeType;
+            });
+          },
+        ),
       ],
     );
 
