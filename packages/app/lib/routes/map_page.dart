@@ -2348,11 +2348,13 @@ class MapPageContentState extends State<MapPageContent> {
                                         width: 40,
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: ThemeColor.primary.withOpacity(
-                                            0.1,
-                                          ),
+                                          color: ThemeColor.inputBackground,
                                           borderRadius: BorderRadius.circular(
                                             20,
+                                          ),
+                                          border: Border.all(
+                                            color: ThemeColor.divider,
+                                            width: 1,
                                           ),
                                         ),
                                         child: Center(
@@ -2361,7 +2363,7 @@ class MapPageContentState extends State<MapPageContent> {
                                             style: const TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color: ThemeColor.primary,
+                                              color: ThemeColor.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -2486,8 +2488,7 @@ class MapPageContentState extends State<MapPageContent> {
                                                 bottom: 0,
                                                 child: Container(
                                                   width: 2,
-                                                  color: ThemeColor.primary
-                                                      .withOpacity(0.3),
+                                                  color: ThemeColor.divider,
                                                 ),
                                               ),
                                               // Arrow icon
@@ -2498,8 +2499,7 @@ class MapPageContentState extends State<MapPageContent> {
                                                   color: ThemeColor.background,
                                                   shape: BoxShape.circle,
                                                   border: Border.all(
-                                                    color: ThemeColor.primary
-                                                        .withOpacity(0.3),
+                                                    color: ThemeColor.divider,
                                                     width: 2,
                                                   ),
                                                 ),
@@ -2514,7 +2514,7 @@ class MapPageContentState extends State<MapPageContent> {
                                                       ? LucideIcons.bike
                                                       : LucideIcons.car,
                                                   size: 12,
-                                                  color: ThemeColor.textPrimary,
+                                                  color: ThemeColor.textSecondary,
                                                 ),
                                               ),
                                             ],
@@ -2611,8 +2611,7 @@ class MapPageContentState extends State<MapPageContent> {
                                   vertical: 16,
                                 ),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: ThemeColor.primary),
-                                  color: ThemeColor.transparent,
+                                  color: ThemeColor.secondary,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
@@ -2623,7 +2622,7 @@ class MapPageContentState extends State<MapPageContent> {
                                           ? LucideIcons.refreshCw
                                           : LucideIcons.route,
                                       size: 20,
-                                      color: ThemeColor.primary,
+                                      color: ThemeColor.textPrimary,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
@@ -2633,7 +2632,7 @@ class MapPageContentState extends State<MapPageContent> {
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
-                                        color: ThemeColor.primary,
+                                        color: ThemeColor.textPrimary,
                                       ),
                                     ),
                                   ],
