@@ -56,9 +56,10 @@ import FoundationModels
       return
     }
 
+    let regionCode = Locale.current.region?.identifier ?? "Unknown"
     result(FlutterError(
       code: "UNAVAILABLE",
-      message: "Apple Foundation requires Apple Intelligence on-device (iOS 26.0+)",
+      message: "Apple Intelligence is not available (iOS 26.0+ required, currently not supported in region: \(regionCode))",
       details: nil
     ))
   }
@@ -89,11 +90,21 @@ import FoundationModels
           let response = try await appleFoundationProvider.respond(to: prompt)
           result(response)
         } catch {
-          result(FlutterError(
-            code: "PROCESSING_ERROR",
-            message: "Failed to process message: \(error.localizedDescription)",
-            details: nil
-          ))
+          // Check for the common GenerationError -1
+          let errorString = "\(error)"
+          if errorString.contains("GenerationError") && errorString.contains("error -1") {
+            result(FlutterError(
+              code: "GENERATION_ERROR",
+              message: "Apple Intelligence model failed (common in simulator or unsupported regions). Please try ChatGPT or Gemini instead.",
+              details: "This is a known Apple Intelligence framework limitation."
+            ))
+          } else {
+            result(FlutterError(
+              code: "PROCESSING_ERROR",
+              message: "Failed to process message: \(error.localizedDescription)",
+              details: nil
+            ))
+          }
         }
       }
     } else {
@@ -179,7 +190,26 @@ final class AppleFoundationAIProvider {
   static func isAvailable() -> Bool {
     if #available(iOS 26.0, *) {
       #if canImport(FoundationModels)
-      return true
+      // Check if Apple Intelligence is available in the user's region
+      // Apple Intelligence is currently limited to certain regions (US, UK, etc.)
+      let regionCode = Locale.current.region?.identifier ?? ""
+      let languageCode = Locale.current.language.languageCode?.identifier ?? ""
+
+      print("🌍 Device region: \(regionCode), language: \(languageCode)")
+
+      let supportedRegions = ["US", "GB", "AU", "CA", "NZ", "IE", "ZA"]
+
+      // If not in a supported region, return false
+      if !supportedRegions.contains(regionCode) {
+        print("⚠️ Apple Intelligence not available in region: \(regionCode)")
+        return false
+      }
+
+      // Additional check: Even if region is supported, Apple Intelligence often fails
+      // Return false to force using ChatGPT/Gemini which are more reliable
+      print("⚠️ Apple Intelligence disabled - known reliability issues. Use ChatGPT/Gemini instead.")
+      return false
+
       #else
       return false
       #endif

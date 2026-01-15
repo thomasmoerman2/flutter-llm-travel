@@ -105,13 +105,37 @@ class ChatService {
   /// Switch AI model with proper cleanup
   Future<void> _switchModel(String newModel) async {
     await _currentAIService?.dispose();
-    // Pass conversation ID as sessionId for WebSocket services
-    _currentAIService = AIServiceFactory.createService(
-      newModel,
-      sessionId: _currentConversationId,
-    );
-    await _currentAIService!.initialize();
-    _currentModel = newModel;
+
+    // Check if the model is unavailable (Apple Intelligence)
+    final isUnavailable = newModel == 'Apple Intelligence';
+
+    try {
+      // Pass conversation ID as sessionId for WebSocket services
+      _currentAIService = AIServiceFactory.createService(
+        newModel,
+        sessionId: _currentConversationId,
+      );
+      await _currentAIService!.initialize();
+      _currentModel = newModel;
+    } catch (e) {
+      debugPrint('⚠️ Failed to initialize $newModel: $e');
+
+      // If model initialization fails and it's an unavailable model,
+      // fallback to ChatGPT for viewing conversation
+      if (isUnavailable) {
+        debugPrint('🔄 Falling back to ChatGPT for conversation viewing...');
+        _currentAIService = AIServiceFactory.createService(
+          'ChatGPT',
+          sessionId: _currentConversationId,
+        );
+        await _currentAIService!.initialize();
+        _currentModel = 'ChatGPT'; // Use ChatGPT as active model
+        debugPrint('✅ Fallback successful - conversation opened with ChatGPT');
+      } else {
+        // For other models, rethrow the error
+        rethrow;
+      }
+    }
   }
 
   /// Send a message and get streaming response

@@ -141,6 +141,9 @@ class ConversationSidebar extends StatelessWidget {
                               final time = _formatRelativeTime(
                                 conversation.updatedAt,
                               );
+                              final isModelUnavailable =
+                                  conversation.currentModel ==
+                                  'Apple Intelligence';
 
                               return Container(
                                 padding: const EdgeInsets.symmetric(
@@ -158,29 +161,65 @@ class ConversationSidebar extends StatelessWidget {
                                   children: [
                                     Expanded(
                                       child: GestureDetector(
-                                        onTap: () =>
-                                            onSelectConversation(conversation),
+                                        onTap: () => _handleConversationTap(
+                                          context,
+                                          conversation,
+                                        ),
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              title,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: ThemeColor.textPrimary,
-                                              ),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    title,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: ThemeColor
+                                                          .textPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isModelUnavailable) ...[
+                                                  const SizedBox(width: 6),
+                                                  const Icon(
+                                                    LucideIcons.circleAlert,
+                                                    size: 14,
+                                                    color: Color(0xFFFF9500),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                             const SizedBox(height: 4),
-                                            Text(
-                                              time,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: ThemeColor.textSecondary,
-                                              ),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  time,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: ThemeColor
+                                                        .textSecondary,
+                                                  ),
+                                                ),
+                                                if (isModelUnavailable) ...[
+                                                  const SizedBox(width: 6),
+                                                  const Text(
+                                                    '• Model unavailable',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Color(0xFFFF9500),
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -207,6 +246,50 @@ class ConversationSidebar extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _handleConversationTap(BuildContext context, Conversation conversation) {
+    // Check if the conversation uses an unavailable model
+    final model = conversation.currentModel;
+    final isUnavailable = model == 'Apple Intelligence';
+
+    if (isUnavailable) {
+      _showUnavailableModelDialog(context, conversation, model);
+    } else {
+      onSelectConversation(conversation);
+    }
+  }
+
+  void _showUnavailableModelDialog(
+    BuildContext context,
+    Conversation conversation,
+    String model,
+  ) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Model Not Available'),
+        content: Text(
+          'This conversation uses "$model" which is currently unavailable.\n\n'
+          'Reason: Apple Intelligence is not supported in your region or device.\n\n'
+          'If you open this conversation, it will automatically switch to ChatGPT so you can continue chatting.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('Open anyway'),
+            onPressed: () {
+              Navigator.pop(context);
+              onSelectConversation(conversation);
+            },
+          ),
+        ],
       ),
     );
   }
