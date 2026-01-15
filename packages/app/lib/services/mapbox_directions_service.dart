@@ -105,6 +105,41 @@ class LocationData {
   String get coordinateString => '$longitude,$latitude';
 }
 
+/// Route option representing a complete itinerary with multiple locations
+class RouteOption {
+  final String name;
+  final String description;
+  final List<LocationData> locations;
+  final String? id; // Unique identifier for selection
+
+  RouteOption({
+    required this.name,
+    required this.description,
+    required this.locations,
+    String? id,
+  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+  factory RouteOption.fromJson(Map<String, dynamic> json) {
+    final locationsList = json['locations'] as List<dynamic>? ?? [];
+    return RouteOption(
+      name: json['name'] as String? ?? 'Route Option',
+      description: json['description'] as String? ?? '',
+      locations: locationsList
+          .map((loc) => LocationData.fromJson(loc as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'description': description,
+      'locations': locations.map((loc) => loc.toJson()).toList(),
+      'id': id,
+    };
+  }
+}
+
 /// Route information from Mapbox Directions API
 class RouteInfo {
   final List<LocationData> waypoints;
