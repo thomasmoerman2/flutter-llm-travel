@@ -114,132 +114,149 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: ThemeColor.background,
+    return CupertinoPageScaffold(
+      backgroundColor: ThemeColor.background,
+      resizeToAvoidBottomInset: true,
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(flex: 2),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight:
+                  MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom -
+                  MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Spacer(flex: 2),
 
-              // Title
-              const Text(
-                'Welcome\nuser!',
-                style: TextStyle(
-                  fontSize: 56,
-                  fontWeight: FontWeight.bold,
-                  height: 1.1,
-                  color: ThemeColor.textPrimary,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Subtitle
-              const Text(
-                'Repeat your password to complete the\nregistration as new user.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: ThemeColor.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-
-              const Spacer(flex: 3),
-
-              // Email Input
-              AuthInputField(
-                controller: _emailController,
-                hintText: 'E-mail',
-                icon: LucideIcons.atSign,
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 12),
-
-              // Password Input
-              AuthInputField(
-                controller: _passwordController,
-                hintText: 'Password',
-                icon: LucideIcons.lock,
-                isPassword: true,
-              ),
-
-              const SizedBox(height: 12),
-
-              // Repeat Password Input
-              AuthInputField(
-                controller: _repeatPasswordController,
-                hintText: 'Repeat Password',
-                icon: LucideIcons.lock,
-                isPassword: true,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Register Button
-              GestureDetector(
-                onTap: _isLoading ? null : _handleRegister,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    color: ThemeColor.inputBackground,
-                    borderRadius: BorderRadius.circular(28),
+                  // Title
+                  const Text(
+                    'Welcome\nuser!',
+                    style: TextStyle(
+                      fontSize: 56,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                      color: ThemeColor.textPrimary,
+                    ),
                   ),
-                  child: _isLoading
-                      ? const Center(
-                          child: CupertinoActivityIndicator(
-                            color: ThemeColor.textPrimary,
-                          ),
-                        )
-                      : const Text(
-                          'Register',
-                          textAlign: TextAlign.center,
+
+                  const SizedBox(height: 16),
+
+                  // Subtitle
+                  const Text(
+                    'Repeat your password to complete the\nregistration as new user.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: ThemeColor.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const Spacer(flex: 3),
+
+                  // Email Input
+                  AuthInputField(
+                    controller: _emailController,
+                    hintText: 'E-mail',
+                    icon: LucideIcons.atSign,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Password Input
+                  AuthInputField(
+                    controller: _passwordController,
+                    hintText: 'Password',
+                    icon: LucideIcons.lock,
+                    isPassword: true,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Repeat Password Input
+                  AuthInputField(
+                    controller: _repeatPasswordController,
+                    hintText: 'Repeat Password',
+                    icon: LucideIcons.lock,
+                    isPassword: true,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Register Button
+                  GestureDetector(
+                    onTap: _isLoading ? null : _handleRegister,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      decoration: BoxDecoration(
+                        color: ThemeColor.inputBackground,
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: CupertinoActivityIndicator(
+                                color: ThemeColor.textPrimary,
+                              ),
+                            )
+                          : const Text(
+                              'Register',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ThemeColor.textPrimary,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Back / Start as guest
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: _handleBack,
+                        child: const Text(
+                          'Back',
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
                             color: ThemeColor.textPrimary,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Back / Start as guest
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: _handleBack,
-                    child: const Text(
-                      'Back',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: ThemeColor.textPrimary,
-                        decoration: TextDecoration.underline,
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                  GestureDetector(
-                    onTap: _handleStartAsGuest,
-                    child: const Text(
-                      'Start as guest',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: ThemeColor.textSecondary,
+                      const SizedBox(width: 24),
+                      GestureDetector(
+                        onTap: _handleStartAsGuest,
+                        child: const Text(
+                          'Start as guest',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: ThemeColor.textSecondary,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
+
+                  const Spacer(flex: 2),
                 ],
               ),
-
-              const Spacer(flex: 2),
-            ],
+            ),
           ),
         ),
       ),

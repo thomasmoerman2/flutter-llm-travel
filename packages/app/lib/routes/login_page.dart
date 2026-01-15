@@ -40,7 +40,10 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final result = await _authService.loginWithEmailAndPassword(email, password);
+      final result = await _authService.loginWithEmailAndPassword(
+        email,
+        password,
+      );
 
       if (!mounted) return;
 
@@ -90,9 +93,7 @@ class _LoginPageState extends State<LoginPage> {
   void _handleRegister() {
     Navigator.push(
       context,
-      CupertinoPageRoute(
-        builder: (context) => const RegisterPage(),
-      ),
+      CupertinoPageRoute(builder: (context) => const RegisterPage()),
     );
   }
 
@@ -108,122 +109,139 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: ThemeColor.background,
+    return CupertinoPageScaffold(
+      backgroundColor: ThemeColor.background,
+      resizeToAvoidBottomInset: true,
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(flex: 2),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight:
+                  MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom -
+                  MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Spacer(flex: 2),
 
-              // Title
-              const Text(
-                'Travel\nwith AI',
-                style: TextStyle(
-                  fontSize: 56,
-                  fontWeight: FontWeight.bold,
-                  height: 1.1,
-                  color: ThemeColor.textPrimary,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Subtitle
-              const Text(
-                'Have the best experience with traveling\nusing optional supported AI.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: ThemeColor.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-
-              const Spacer(flex: 3),
-
-              // Email Input
-              AuthInputField(
-                controller: _emailController,
-                hintText: 'E-mail',
-                icon: LucideIcons.atSign,
-                keyboardType: TextInputType.emailAddress,
-              ),
-
-              const SizedBox(height: 12),
-
-              // Password Input
-              AuthInputField(
-                controller: _passwordController,
-                hintText: 'Password',
-                icon: LucideIcons.lock,
-                isPassword: true,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Connect Button
-              GestureDetector(
-                onTap: _isLoading ? null : _handleLogin,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    color: ThemeColor.primary,
-                    borderRadius: BorderRadius.circular(28),
+                  // Title
+                  const Text(
+                    'Travel\nwith AI',
+                    style: TextStyle(
+                      fontSize: 56,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                      color: ThemeColor.textPrimary,
+                    ),
                   ),
-                  child: _isLoading
-                      ? const Center(
-                          child: CupertinoActivityIndicator(
-                            color: ThemeColor.background,
-                          ),
-                        )
-                      : const Text(
-                          'Connect',
-                          textAlign: TextAlign.center,
+
+                  const SizedBox(height: 16),
+
+                  // Subtitle
+                  const Text(
+                    'Have the best experience with traveling\nusing optional supported AI.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: ThemeColor.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const Spacer(flex: 3),
+
+                  // Email Input
+                  AuthInputField(
+                    controller: _emailController,
+                    hintText: 'E-mail',
+                    icon: LucideIcons.atSign,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Password Input
+                  AuthInputField(
+                    controller: _passwordController,
+                    hintText: 'Password',
+                    icon: LucideIcons.lock,
+                    isPassword: true,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Connect Button
+                  GestureDetector(
+                    onTap: _isLoading ? null : _handleLogin,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      decoration: BoxDecoration(
+                        color: ThemeColor.primary,
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: CupertinoActivityIndicator(
+                                color: ThemeColor.background,
+                              ),
+                            )
+                          : const Text(
+                              'Connect',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ThemeColor.textPrimary,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Register / Start as guest
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: _handleRegister,
+                        child: const Text(
+                          'Register',
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: ThemeColor.background,
+                            fontSize: 15,
+                            color: ThemeColor.textPrimary,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Register / Start as guest
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: _handleRegister,
-                    child: const Text(
-                      'Register',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: ThemeColor.textPrimary,
-                        decoration: TextDecoration.underline,
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                  GestureDetector(
-                    onTap: _handleStartAsGuest,
-                    child: const Text(
-                      'Start as guest',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: ThemeColor.textSecondary,
+                      const SizedBox(width: 24),
+                      GestureDetector(
+                        onTap: _handleStartAsGuest,
+                        child: const Text(
+                          'Start as guest',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: ThemeColor.textSecondary,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
+
+                  const Spacer(flex: 2),
                 ],
               ),
-
-              const Spacer(flex: 2),
-            ],
+            ),
           ),
         ),
       ),
