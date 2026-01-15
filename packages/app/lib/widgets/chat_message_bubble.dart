@@ -7,12 +7,15 @@ import 'package:intl/intl.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../models/chat_message.dart';
 import '../services/theme_color.dart';
+import '../services/mapbox_directions_service.dart';
+import 'route_option_card.dart';
 
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool showModel;
   final VoidCallback? onShowOnMap;
   final void Function(String text)? onResend;
+  final void Function(RouteOption option)? onSelectRouteOption;
 
   const ChatMessageBubble({
     super.key,
@@ -20,6 +23,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.showModel = false,
     this.onShowOnMap,
     this.onResend,
+    this.onSelectRouteOption,
   });
 
   @override
@@ -168,6 +172,12 @@ class ChatMessageBubble extends StatelessWidget {
                     // Route details (for AI messages with route information)
                     if (!isUser && message.hasRoute && message.metadata != null)
                       ..._buildRouteDetails(),
+
+                    // Route options (when AI returns multiple route suggestions)
+                    if (!isUser &&
+                        message.metadata != null &&
+                        _hasRouteOptions())
+                      ..._buildRouteOptions(),
 
                     // Show on Map button (for AI messages with locations/routes)
                     if (showMapAction && onShowOnMap != null) ...[
@@ -441,6 +451,80 @@ class ChatMessageBubble extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    ];
+  }
+
+  bool _hasRouteOptions() {
+    final metadata = message.metadata;
+    if (metadata == null) return false;
+
+    final routeOptions = metadata['routeOptions'];
+    return routeOptions is List && routeOptions.isNotEmpty;
+  }
+
+  List<Widget> _buildRouteOptions() {
+    final metadata = message.metadata!;
+    final routeOptionsData = metadata['routeOptions'] as List<dynamic>?;
+
+    if (routeOptionsData == null || routeOptionsData.isEmpty) {
+      return [];
+    }
+
+    // Parse route options
+    final routeOptions = routeOptionsData
+        .map((data) {
+          try {
+            return RouteOption.fromJson(data as Map<String, dynamic>);
+          } catch (e) {
+            debugPrint('⚠️ Failed to parse route option: $e');
+            return null;
+          }
+        })
+        .whereType<RouteOption>()
+        .toList();
+
+    if (routeOptions.isEmpty) {
+      return [];
+    }
+
+    return [
+      const SizedBox(height: 12),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          const Row(
+            children: [
+              Icon(
+                LucideIcons.listTree,
+                size: 14,
+                color: ThemeColor.textSecondary,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'Choose a Route Option',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ThemeColor.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Option cards
+          ...routeOptions.map(
+            (option) => RouteOptionCard(
+              option: option,
+              onTap: () {
+                if (onSelectRouteOption != null) {
+                  onSelectRouteOption!(option);
+                }
+              },
+            ),
+          ),
+        ],
       ),
     ];
   }
