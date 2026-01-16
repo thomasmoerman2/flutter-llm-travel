@@ -111,7 +111,7 @@ Always provide accurate coordinates. If the user's request is not travel-related
                 Log.Error(ex, "Unexpected error in GPT endpoint: {ErrorMessage}", ex.Message);
                 return Results.Problem("An unexpected error occurred while processing your request", statusCode: 500);
             }
-        });
+        }).RequireAuthorization();
         endpoint.MapPost("/gemini", async (HttpContext context, IConfiguration configuration) =>
         {
             try
@@ -209,7 +209,7 @@ Always provide accurate coordinates. If the user's request is not travel-related
                 Log.Error(ex, "Unexpected error in Gemini endpoint: {ErrorMessage}", ex.Message);
                 return Results.Problem("An unexpected error occurred while processing your request", statusCode: 500);
             }
-        });
+        }).RequireAuthorization();
         endpoint.MapPost("/hybrid", async (HttpContext context, IConfiguration configuration) =>
         {
             try
@@ -353,7 +353,7 @@ Keep the same format and structure, just enhance the content.";
                 Log.Error(ex, "Unexpected error in Hybrid endpoint: {ErrorMessage}", ex.Message);
                 return Results.Problem("An unexpected error occurred while processing your request", statusCode: 500);
             }
-        });
+        }).RequireAuthorization();
         return endpoint;
     }
 }
