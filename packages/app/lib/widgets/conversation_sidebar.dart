@@ -272,9 +272,8 @@ class ConversationSidebar extends StatelessWidget {
       builder: (context) => CupertinoAlertDialog(
         title: const Text('Model Not Available'),
         content: Text(
-          'This conversation uses "$model" which is currently unavailable.\n\n'
-          'Reason: Apple Intelligence is not supported in your region or device.\n\n'
-          'If you open this conversation, it will automatically switch to ChatGPT so you can continue chatting.',
+          'This conversation uses "$model" which is currently unavailable in your region.\n\n'
+          'You can view the conversation history but cannot send new messages with this model.',
         ),
         actions: [
           CupertinoDialogAction(

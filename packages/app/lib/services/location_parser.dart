@@ -6,11 +6,15 @@ class ParsedLocationResponse {
   final List<LocationData> locations;
   final RouteType? routeType;
   final String cleanedText;
+  final List<RouteOption>? routeOptions; // Multiple route alternatives
+  final bool hasMultipleOptions;
 
   const ParsedLocationResponse({
     required this.locations,
     required this.routeType,
     required this.cleanedText,
+    this.routeOptions,
+    this.hasMultipleOptions = false,
   });
 }
 
@@ -27,73 +31,110 @@ class LocationParser {
   }
 
   static ParsedLocationResponse parseLocationsAndRoute(String responseText) {
-    debugPrint('🔍 LocationParser: Searching for JSON in response (${responseText.length} chars)');
+    // debugPrint('🔍 LocationParser: Searching for JSON in response (${responseText.length} chars)');
     final match = _firstJsonBlock(responseText);
     if (match == null) {
-      debugPrint('❌ LocationParser: No JSON block found');
+      // debugPrint('❌ LocationParser: No JSON block found');
       return ParsedLocationResponse(
         locations: const [],
         routeType: null,
         cleanedText: responseText.trim(),
+        hasMultipleOptions: false,
       );
     }
 
     final jsonString = match.group(1);
-    debugPrint('📦 LocationParser: Found JSON block (${jsonString?.length ?? 0} chars)');
+    // debugPrint('📦 LocationParser: Found JSON block (${jsonString?.length ?? 0} chars)');
     if (jsonString == null || jsonString.trim().isEmpty) {
-      debugPrint('⚠️ LocationParser: JSON block is empty');
+      // debugPrint('⚠️ LocationParser: JSON block is empty');
       return ParsedLocationResponse(
         locations: const [],
         routeType: null,
         cleanedText: cleanResponseText(responseText),
+        hasMultipleOptions: false,
       );
     }
 
     try {
-      debugPrint('🔄 LocationParser: Parsing JSON...');
-      debugPrint('📄 Raw JSON content:\n$jsonString');
+      // debugPrint('🔄 LocationParser: Parsing JSON...');
+      // debugPrint('📄 Raw JSON content:\n$jsonString');
       final jsonData = jsonDecode(jsonString);
       if (jsonData is! Map<String, dynamic>) {
-        debugPrint('❌ LocationParser: JSON is not a Map');
+        // debugPrint('❌ LocationParser: JSON is not a Map');
         return ParsedLocationResponse(
           locations: const [],
           routeType: null,
           cleanedText: cleanResponseText(responseText),
         );
       }
-      debugPrint('✅ LocationParser: JSON parsed successfully');
-      debugPrint('🔑 JSON keys: ${jsonData.keys.join(", ")}');
+      // debugPrint('✅ LocationParser: JSON parsed successfully');
+      // debugPrint('🔑 JSON keys: ${jsonData.keys.join(", ")}');
 
+      // Check if this is a multiple options response
+      final hasMultipleOptions = jsonData['multipleOptions'] == true;
+      if (hasMultipleOptions) {
+        // debugPrint('🔀 LocationParser: Multiple route options detected');
+        final optionsValue = jsonData['options'];
+        final routeOptionsList = <RouteOption>[];
+
+        if (optionsValue is List) {
+          // debugPrint('📋 LocationParser: Processing ${optionsValue.length} route options');
+          for (final option in optionsValue) {
+            if (option is! Map<String, dynamic>) {
+              // debugPrint('⚠️ Skipping non-map option entry: $option');
+              continue;
+            }
+            try {
+              final routeOption = RouteOption.fromJson(option);
+              routeOptionsList.add(routeOption);
+              // debugPrint('✅ Parsed route option: ${routeOption.name} with ${routeOption.locations.length} locations');
+            } catch (e) {
+              // debugPrint('⚠️ Failed to parse route option: $e');
+            }
+          }
+        }
+
+        return ParsedLocationResponse(
+          locations: const [],
+          routeType: null,
+          cleanedText: cleanResponseText(responseText),
+          routeOptions: routeOptionsList,
+          hasMultipleOptions: true,
+        );
+      }
+
+      // Single route parsing (existing logic)
       final locationsValue = jsonData['locations'];
-      debugPrint('📍 LocationParser: Found locations field: ${locationsValue != null ? "yes (${locationsValue is List ? (locationsValue as List).length : "not a list"})" : "no"}');
+      // debugPrint('📍 LocationParser: Found locations field: ${locationsValue != null ? "yes (${locationsValue is List ? (locationsValue as List).length : "not a list"})" : "no"}');
       final locationList = <LocationData>[];
       if (locationsValue is List) {
-        debugPrint('🔢 LocationParser: Processing ${locationsValue.length} location entries');
+        // debugPrint('🔢 LocationParser: Processing ${locationsValue.length} location entries');
         for (final loc in locationsValue) {
           if (loc is! Map<String, dynamic>) {
-            debugPrint('⚠️ Skipping non-map location entry: $loc');
+            // debugPrint('⚠️ Skipping non-map location entry: $loc');
             continue;
           }
           try {
             final locationData = LocationData.fromJson(loc);
             locationList.add(locationData);
-            debugPrint('✅ Parsed location: ${locationData.name}');
+            // debugPrint('✅ Parsed location: ${locationData.name}');
           } catch (e) {
-            debugPrint('⚠️ Failed to parse location: $e');
-            debugPrint('   Location data was: $loc');
+            // debugPrint('⚠️ Failed to parse location: $e');
+            // debugPrint('   Location data was: $loc');
           }
         }
       }
-      debugPrint('📊 LocationParser: Total locations parsed: ${locationList.length}');
+      // debugPrint('📊 LocationParser: Total locations parsed: ${locationList.length}');
 
       final routeType = _parseRouteType(jsonData, locationList);
       return ParsedLocationResponse(
         locations: locationList,
         routeType: routeType,
         cleanedText: cleanResponseText(responseText),
+        hasMultipleOptions: false,
       );
     } catch (e) {
-      debugPrint('❌ Error parsing locations: $e');
+      // debugPrint('❌ Error parsing locations: $e');
       return ParsedLocationResponse(
         locations: const [],
         routeType: null,
@@ -106,14 +147,12 @@ class LocationParser {
   ///
   /// Returns the cleaned text without the JSON blocks
   static String cleanResponseText(String responseText) {
-    return responseText.replaceAll(
-      RegExp(
-        r'```json\s*\n.*?\n```',
-        multiLine: true,
-        dotAll: true,
-      ),
-      '',
-    ).trim();
+    return responseText
+        .replaceAll(
+          RegExp(r'```json\s*\n.*?\n```', multiLine: true, dotAll: true),
+          '',
+        )
+        .trim();
   }
 
   static RegExpMatch? _firstJsonBlock(String responseText) {
@@ -132,7 +171,8 @@ class LocationParser {
     dynamic routeValue = jsonData['routeType'] ?? jsonData['mode'];
     final routeData = jsonData['route'];
     if (routeValue == null && routeData is Map<String, dynamic>) {
-      routeValue = routeData['type'] ?? routeData['mode'] ?? routeData['routeType'];
+      routeValue =
+          routeData['type'] ?? routeData['mode'] ?? routeData['routeType'];
       if (routeValue == null && routeData['enabled'] == true) {
         routeValue = true;
       }

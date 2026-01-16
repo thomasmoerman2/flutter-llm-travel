@@ -235,7 +235,14 @@ class ChatService {
       final responseMetadata = Map<String, dynamic>.from(
         _currentAIService!.getResponseMetadata(),
       );
-      if (parsed.locations.isNotEmpty) {
+
+      // Check if we have multiple route options
+      if (parsed.hasMultipleOptions && parsed.routeOptions != null) {
+        debugPrint('🔀 Multiple route options found: ${parsed.routeOptions!.length}');
+        responseMetadata['routeOptions'] =
+            parsed.routeOptions!.map((option) => option.toJson()).toList();
+        debugPrint('✅ Added route options to metadata');
+      } else if (parsed.locations.isNotEmpty) {
         responseMetadata['locations'] =
             parsed.locations.map((location) => location.toJson()).toList();
         debugPrint('✅ Added locations to metadata');

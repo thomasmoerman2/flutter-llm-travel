@@ -448,6 +448,23 @@ class HomePageContentState extends State<HomePageContent>
     callback(locations, routeType);
   }
 
+  void _handleSelectRouteOption(RouteOption option) {
+    debugPrint('📍 Route option selected: ${option.name}');
+    debugPrint('   ${option.locations.length} locations in this option');
+
+    final callback = widget.onShowOnMap;
+    if (callback == null) {
+      debugPrint('❌ No onShowOnMap callback provided');
+      return;
+    }
+
+    // Auto-detect route type based on locations
+    final routeType = MapboxDirectionsService.detectRouteType(option.locations);
+    debugPrint('🛣️ Detected route type: ${routeType.name}');
+    debugPrint('✅ Calling onShowOnMap callback with route option');
+    callback(option.locations, routeType);
+  }
+
   List<LocationData> _extractLocations(ChatMessage message) {
     final locationsData = message.metadata?['locations'];
     if (locationsData is! List) return [];
@@ -523,6 +540,7 @@ class HomePageContentState extends State<HomePageContent>
                         onResend: message.isUser
                             ? (text) => _resendMessage(text)
                             : null,
+                        onSelectRouteOption: (option) => _handleSelectRouteOption(option),
                       );
                     },
                   ),
