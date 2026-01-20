@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/chat_message.dart';
 import '../env_config.dart';
 import 'ai_service.dart';
@@ -55,6 +56,23 @@ class RestAIService implements AIService {
         return 'hybrid';
       default:
         return 'chatgpt';
+    }
+  }
+
+  /// Get Firebase ID token for authentication
+  Future<String?> _getFirebaseToken() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ No authenticated user found');
+        return null;
+      }
+      final token = await user.getIdToken();
+      debugPrint('✅ Firebase token retrieved for user: ${user.uid}');
+      return token;
+    } catch (e) {
+      debugPrint('❌ Failed to get Firebase token: $e');
+      return null;
     }
   }
 
@@ -173,6 +191,15 @@ Remember: Include ALL locations you mention with their REAL coordinates!
       debugPrint('📤 Sending REST request to: $apiUrl');
       debugPrint('📝 Request body: ${jsonEncode(requestBody)}');
 
+      // Get Firebase authentication token
+      final token = await _getFirebaseToken();
+      if (token == null) {
+        throw AIServiceException(
+          'Authentication required. Please sign in to continue.',
+          code: 'UNAUTHENTICATED',
+        );
+      }
+
       // Send POST request with timeout
       final response = await http
           .post(
@@ -180,6 +207,7 @@ Remember: Include ALL locations you mention with their REAL coordinates!
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
+              'Authorization': 'Bearer $token',
             },
             body: jsonEncode(requestBody),
           )

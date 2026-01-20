@@ -2,7 +2,7 @@
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
-    .MinimumLevel.Warning()
+    .MinimumLevel.Debug()
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,13 +11,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(Log.Logger);
 
-if (builder.Configuration["FirebaseCredentials"] != null) // FirebaseConfig
+var firebaseConfig = builder.Configuration.GetSection("FirebaseCredentials");
+if (firebaseConfig.Exists() && firebaseConfig.GetChildren().Any()) // FirebaseConfig
 {
     Log.Information("[X] FirebaseCredentials : Found");
     try
     {
-        string json = builder.Configuration["FirebaseCredentials"];
-        // Initialize Firebase with Key Vault credentials
+        // Serialize the configuration section to JSON
+        string json = System.Text.Json.JsonSerializer.Serialize(
+            firebaseConfig.Get<Dictionary<string, object>>()
+        );
+        // Initialize Firebase with credentials
         FirebaseApp.Create(new AppOptions()
         {
             Credential = GoogleCredential.FromJson(json),
@@ -43,14 +47,14 @@ builder.Services.AddCors(options =>
         builder.AllowAnyOrigin()
             .WithOrigins("*")
             .WithMethods("GET", "POST", "DELETE")
-           .WithHeaders("X-MCT-Header");
+           .WithHeaders("X-MCT-Header", "Authorization", "Content-Type");
     });
     options.AddPolicy("production", builder =>
     {
         builder.AllowAnyOrigin()
             .WithOrigins(corsEnv)
             .WithMethods("GET", "POST", "DELETE")
-           .WithHeaders("X-MCT-Header");
+           .WithHeaders("X-MCT-Header", "Authorization", "Content-Type");
     });
 });
 builder.Services.AddMvc();
@@ -64,6 +68,8 @@ builder.Services.AddAuthentication("Firebase")
 // Services container
 var app = builder.Build();
 app.UseCors("MyCORS");
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseSwagger(); // default endpoint is /swagger/v1/swagger.json
 app.UseSwaggerUI(options =>
 {
