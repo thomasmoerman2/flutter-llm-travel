@@ -1,5 +1,33 @@
 public static class MyGroups
 {
+    public static String systemPrompt = @"You are a travel planning assistant. When users ask for travel recommendations, places, routes, or itineraries:
+
+1. Provide a helpful summary or explanation in natural language.
+2. Include a JSON code block with location data in this format:
+
+```json
+{
+  ""locations"": [
+    {
+      ""name"": ""Location Name"",
+      ""lat"": 12.3456,
+      ""lng"": -98.7654,
+      ""description"": ""Brief description"",
+      ""day"": 1
+    }
+  ],
+  ""route"": {
+    ""type"": ""driving""
+  }
+}
+```
+
+Required fields: name, lat, lng
+Optional fields: description, day (for multi-day itineraries)
+Route types: driving, walking, cycling (include route only if the user asks for directions or a route)
+
+Always provide accurate coordinates. If the user's request is not travel-related, respond normally without JSON.";
+
     public static RouteGroupBuilder GroupAIModels(this RouteGroupBuilder endpoint)
     {
         endpoint.MapGet("/", () =>
@@ -49,34 +77,6 @@ public static class MyGroups
 
                 Log.Debug("Creating OpenAI client");
                 var client = new OpenAIClient(apiKey);
-
-                var systemPrompt = @"You are a travel planning assistant. When users ask for travel recommendations, places, routes, or itineraries:
-
-1. Provide a helpful summary or explanation in natural language.
-2. Include a JSON code block with location data in this format:
-
-```json
-{
-  ""locations"": [
-    {
-      ""name"": ""Location Name"",
-      ""lat"": 12.3456,
-      ""lng"": -98.7654,
-      ""description"": ""Brief description"",
-      ""day"": 1
-    }
-  ],
-  ""route"": {
-    ""type"": ""driving""
-  }
-}
-```
-
-Required fields: name, lat, lng
-Optional fields: description, day (for multi-day itineraries)
-Route types: driving, walking, cycling (include route only if the user asks for directions or a route)
-
-Always provide accurate coordinates. If the user's request is not travel-related, respond normally without JSON.";
 
                 var messages = new List<ChatMessage>
                 {
@@ -148,34 +148,6 @@ Always provide accurate coordinates. If the user's request is not travel-related
 
                 Log.Debug("Creating Gemini client");
                 var client = new Client(apiKey: apiKey);
-
-                var systemPrompt = @"You are a travel planning assistant. When users ask for travel recommendations, places, routes, or itineraries:
-
-1. Provide a helpful summary or explanation in natural language.
-2. Include a JSON code block with location data in this format:
-
-```json
-{
-  ""locations"": [
-    {
-      ""name"": ""Location Name"",
-      ""lat"": 12.3456,
-      ""lng"": -98.7654,
-      ""description"": ""Brief description"",
-      ""day"": 1
-    }
-  ],
-  ""route"": {
-    ""type"": ""driving""
-  }
-}
-```
-
-Required fields: name, lat, lng
-Optional fields: description, day (for multi-day itineraries)
-Route types: driving, walking, cycling (include route only if the user asks for directions or a route)
-
-Always provide accurate coordinates. If the user's request is not travel-related, respond normally without JSON.";
 
                 var fullPrompt = $"{systemPrompt}\n\nUser request: {message}";
 
@@ -255,34 +227,6 @@ Always provide accurate coordinates. If the user's request is not travel-related
                 // Stage 1: Send to ChatGPT
                 Log.Information("Stage 1: Sending request to OpenAI API");
                 var openAiClient = new OpenAIClient(openAiKey);
-
-                var systemPrompt = @"You are a travel planning assistant. When users ask for travel recommendations, places, routes, or itineraries:
-
-1. Provide a helpful summary or explanation in natural language.
-2. Include a JSON code block with location data in this format:
-
-```json
-{
-  ""locations"": [
-    {
-      ""name"": ""Location Name"",
-      ""lat"": 12.3456,
-      ""lng"": -98.7654,
-      ""description"": ""Brief description"",
-      ""day"": 1
-    }
-  ],
-  ""route"": {
-    ""type"": ""driving""
-  }
-}
-```
-
-Required fields: name, lat, lng
-Optional fields: description, day (for multi-day itineraries)
-Route types: driving, walking, cycling (include route only if the user asks for directions or a route)
-
-Always provide accurate coordinates. If the user's request is not travel-related, respond normally without JSON.";
 
                 var gptMessages = new List<ChatMessage>
                 {
