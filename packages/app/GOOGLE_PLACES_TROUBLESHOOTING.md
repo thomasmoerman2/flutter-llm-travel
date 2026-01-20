@@ -152,7 +152,7 @@ Add this temporary code to `map_page.dart` in the `_suggestNearbyPlaces` method:
 ```dart
 // Right after try {
 final testKey = EnvConfig.get('GOOGLE_PLACES_API_KEY');
-debugPrint('🧪 API Key from map_page: ${testKey?.substring(0, 10)}...');
+// debugPrint('🧪 API Key from map_page: ${testKey?.substring(0, 10)}...');
 ```
 
 ### Check .env is Loaded
@@ -160,8 +160,8 @@ debugPrint('🧪 API Key from map_page: ${testKey?.substring(0, 10)}...');
 Add to `main.dart` after `await dotenv.load()`:
 
 ```dart
-debugPrint('🔧 Loaded .env with ${dotenv.env.keys.length} keys');
-debugPrint('🔧 Has GOOGLE_PLACES_API_KEY: ${dotenv.env.containsKey('GOOGLE_PLACES_API_KEY')}');
+// debugPrint('🔧 Loaded .env with ${dotenv.env.keys.length} keys');
+// debugPrint('🔧 Has GOOGLE_PLACES_API_KEY: ${dotenv.env.containsKey('GOOGLE_PLACES_API_KEY')}');
 ```
 
 ## 📞 What to Share When Asking for Help
