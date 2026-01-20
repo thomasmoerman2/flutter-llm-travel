@@ -33,12 +33,12 @@ class AppleIntelligenceService implements AIService {
     }
 
     try {
-      debugPrint('🍎 Initializing Apple Intelligence...');
+      // debugPrint('🍎 Initializing Apple Intelligence...');
       final result = await platform.invokeMethod('initialize');
       _initialized = result == true;
 
       if (_initialized) {
-        debugPrint('✅ Apple Intelligence initialized successfully');
+        // debugPrint('✅ Apple Intelligence initialized successfully');
       } else {
         throw AIServiceException(
           'Failed to initialize Apple Intelligence',
@@ -46,7 +46,7 @@ class AppleIntelligenceService implements AIService {
         );
       }
     } on PlatformException catch (e) {
-      debugPrint('❌ Apple Intelligence initialization failed: ${e.message}');
+      // debugPrint('❌ Apple Intelligence initialization failed: ${e.message}');
       throw AIServiceException(
         e.message ?? 'Failed to initialize Apple Intelligence',
         code: e.code,
@@ -67,8 +67,8 @@ class AppleIntelligenceService implements AIService {
     final startTime = DateTime.now();
 
     try {
-      debugPrint('🍎 Sending message to Apple Intelligence...');
-      debugPrint('📝 Message: $message');
+      // debugPrint('🍎 Sending message to Apple Intelligence...');
+      // debugPrint('📝 Message: $message');
 
       // Convert conversation history to format expected by Swift
       final history = conversationHistory.map((msg) => {
@@ -84,10 +84,10 @@ class AppleIntelligenceService implements AIService {
       });
 
       final elapsed = DateTime.now().difference(startTime).inSeconds;
-      debugPrint('⏱️ Apple Intelligence response received after ${elapsed}s');
+      // debugPrint('⏱️ Apple Intelligence response received after ${elapsed}s');
 
       if (response is String) {
-        debugPrint('✅ Response: ${response.length} characters');
+        // debugPrint('✅ Response: ${response.length} characters');
 
         // Update metadata
         _metadata['processingTime'] = DateTime.now().millisecondsSinceEpoch;
@@ -102,13 +102,13 @@ class AppleIntelligenceService implements AIService {
         );
       }
     } on PlatformException catch (e) {
-      debugPrint('❌ Apple Intelligence error: ${e.message}');
+      // debugPrint('❌ Apple Intelligence error: ${e.message}');
       throw AIServiceException(
         e.message ?? 'Failed to process message on-device',
         code: e.code,
       );
     } catch (e) {
-      debugPrint('❌ Error processing message: $e');
+      // debugPrint('❌ Error processing message: $e');
       throw AIServiceException(
         'Failed to process message on-device',
         originalError: e,
@@ -124,7 +124,7 @@ class AppleIntelligenceService implements AIService {
       final result = await platform.invokeMethod('isAvailable');
       return result == true;
     } catch (e) {
-      debugPrint('⚠️ Apple Intelligence availability check failed: $e');
+      // debugPrint('⚠️ Apple Intelligence availability check failed: $e');
       return false;
     }
   }

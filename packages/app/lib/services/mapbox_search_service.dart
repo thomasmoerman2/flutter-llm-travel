@@ -19,7 +19,7 @@ class MapboxSearchService {
 
     final token = EnvConfig.mapboxAccessToken;
     if (token.isEmpty) {
-      debugPrint('❌ Mapbox access token not found');
+      // debugPrint('❌ Mapbox access token not found');
       throw Exception('Mapbox access token not configured');
     }
 
@@ -32,7 +32,7 @@ class MapboxSearchService {
         '$_baseUrl/$encodedQuery.json?access_token=$token&limit=$limit&types=place,poi,address,region,country'
       );
 
-      debugPrint('🔍 Searching Mapbox: $query');
+      // debugPrint('🔍 Searching Mapbox: $query');
 
       final response = await http.get(url).timeout(
         const Duration(seconds: 10),
@@ -49,14 +49,14 @@ class MapboxSearchService {
           return SearchResult.fromJson(feature as Map<String, dynamic>);
         }).toList();
 
-        debugPrint('✅ Found ${results.length} results for "$query"');
+        // debugPrint('✅ Found ${results.length} results for "$query"');
         return results;
       } else {
-        debugPrint('❌ Mapbox search failed: ${response.statusCode} - ${response.body}');
+        // debugPrint('❌ Mapbox search failed: ${response.statusCode} - ${response.body}');
         throw Exception('Search failed: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ Mapbox search error: $e');
+      // debugPrint('❌ Mapbox search error: $e');
       rethrow;
     }
   }

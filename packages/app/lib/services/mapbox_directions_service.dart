@@ -224,7 +224,7 @@ class MapboxDirectionsService {
         '&steps=false',
       );
 
-      debugPrint('🗺️ Calculating ${routeType.displayName} route with ${waypoints.length} waypoints');
+      // debugPrint('🗺️ Calculating ${routeType.displayName} route with ${waypoints.length} waypoints');
 
       final response = await http.get(url).timeout(
         const Duration(seconds: 15),
@@ -255,7 +255,7 @@ class MapboxDirectionsService {
                 ])
             .toList();
 
-        debugPrint('✅ Route calculated: ${distance / 1000} km, ${duration / 60} min');
+        // debugPrint('✅ Route calculated: ${distance / 1000} km, ${duration / 60} min');
 
         return RouteInfo(
           waypoints: waypoints,
@@ -266,11 +266,11 @@ class MapboxDirectionsService {
           summary: route['legs']?[0]?['summary'] as String?,
         );
       } else {
-        debugPrint('❌ Route calculation failed: ${response.statusCode}');
+        // debugPrint('❌ Route calculation failed: ${response.statusCode}');
         throw Exception('Failed to calculate route: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ Route calculation error: $e');
+      // debugPrint('❌ Route calculation error: $e');
       rethrow;
     }
   }
@@ -305,19 +305,19 @@ class MapboxDirectionsService {
       );
     }
 
-    debugPrint('📏 Total distance: ${totalDistance.toStringAsFixed(1)} km');
+    // debugPrint('📏 Total distance: ${totalDistance.toStringAsFixed(1)} km');
 
     final routeType = detectRouteTypeForDistance(totalDistance);
 
     switch (routeType) {
       case RouteType.walking:
-        debugPrint('🚶 Auto-detected: Walking');
+        // debugPrint('🚶 Auto-detected: Walking');
         break;
       case RouteType.cycling:
-        debugPrint('🚴 Auto-detected: Cycling');
+        // debugPrint('🚴 Auto-detected: Cycling');
         break;
       case RouteType.driving:
-        debugPrint('🚗 Auto-detected: Driving');
+        // debugPrint('🚗 Auto-detected: Driving');
         break;
     }
 
@@ -357,7 +357,7 @@ class MapboxDirectionsService {
       return waypoints; // No optimization needed for 2 or fewer points
     }
 
-    debugPrint('🔧 Optimizing route with ${waypoints.length} waypoints...');
+    // debugPrint('🔧 Optimizing route with ${waypoints.length} waypoints...');
 
     final optimized = <LocationData>[waypoints.first]; // Start with first point
     final remaining = List<LocationData>.from(waypoints.skip(1));
@@ -392,9 +392,9 @@ class MapboxDirectionsService {
     final optimizedDistance = _calculateTotalDistance(optimized);
     final improvement = ((originalDistance - optimizedDistance) / originalDistance * 100);
 
-    debugPrint('📊 Original distance: ${originalDistance.toStringAsFixed(1)} km');
-    debugPrint('📊 Optimized distance: ${optimizedDistance.toStringAsFixed(1)} km');
-    debugPrint('✅ Route optimized! Saved ${improvement.toStringAsFixed(1)}% distance');
+    // debugPrint('📊 Original distance: ${originalDistance.toStringAsFixed(1)} km');
+    // debugPrint('📊 Optimized distance: ${optimizedDistance.toStringAsFixed(1)} km');
+    // debugPrint('✅ Route optimized! Saved ${improvement.toStringAsFixed(1)}% distance');
 
     return optimized;
   }

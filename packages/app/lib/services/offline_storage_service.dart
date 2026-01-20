@@ -23,16 +23,16 @@ class OfflineStorageService {
     required DateTime updatedAt,
   }) async {
     try {
-      debugPrint('💾 [OFFLINE] Attempting to save route: $name (ID: $id)');
+      // debugPrint('💾 [OFFLINE] Attempting to save route: $name (ID: $id)');
       final prefs = await SharedPreferences.getInstance();
 
       // Get existing routes
       final routesJson = prefs.getString(_savedRoutesKey);
-      debugPrint('💾 [OFFLINE] Found existing routes: ${routesJson != null ? 'YES' : 'NO'}');
+      // debugPrint('💾 [OFFLINE] Found existing routes: ${routesJson != null ? 'YES' : 'NO'}');
       final List<dynamic> routes = routesJson != null
           ? jsonDecode(routesJson) as List<dynamic>
           : [];
-      debugPrint('💾 [OFFLINE] Current route count: ${routes.length}');
+      // debugPrint('💾 [OFFLINE] Current route count: ${routes.length}');
 
       // Create route object
       final route = {
@@ -50,11 +50,11 @@ class OfflineStorageService {
 
       // Add new route at the beginning
       routes.insert(0, route);
-      debugPrint('💾 [OFFLINE] New route count after adding: ${routes.length}');
+      // debugPrint('💾 [OFFLINE] New route count after adding: ${routes.length}');
 
       // Save back to SharedPreferences
       final routesString = jsonEncode(routes);
-      debugPrint('💾 [OFFLINE] Encoded route data size: ${routesString.length} chars');
+      // debugPrint('💾 [OFFLINE] Encoded route data size: ${routesString.length} chars');
 
       final success = await prefs.setString(
         _savedRoutesKey,
@@ -62,19 +62,19 @@ class OfflineStorageService {
       );
 
       if (success) {
-        debugPrint('✅ [OFFLINE] Route "$name" saved to offline storage successfully!');
+        // debugPrint('✅ [OFFLINE] Route "$name" saved to offline storage successfully!');
 
         // Verify it was saved
         final verification = prefs.getString(_savedRoutesKey);
-        debugPrint('✅ [OFFLINE] Verification: Route is ${verification != null ? 'present' : 'MISSING'} in storage');
+        // debugPrint('✅ [OFFLINE] Verification: Route is ${verification != null ? 'present' : 'MISSING'} in storage');
       } else {
-        debugPrint('❌ [OFFLINE] Failed to save route "$name" - setString returned false');
+        // debugPrint('❌ [OFFLINE] Failed to save route "$name" - setString returned false');
       }
 
       return success;
     } catch (e, stackTrace) {
-      debugPrint('❌ [OFFLINE] Error saving route to offline storage: $e');
-      debugPrint('❌ [OFFLINE] Stack trace: $stackTrace');
+      // debugPrint('❌ [OFFLINE] Error saving route to offline storage: $e');
+      // debugPrint('❌ [OFFLINE] Stack trace: $stackTrace');
       return false;
     }
   }
@@ -92,7 +92,7 @@ class OfflineStorageService {
       final List<dynamic> routes = jsonDecode(routesJson) as List<dynamic>;
       return routes.map((r) => r as Map<String, dynamic>).toList();
     } catch (e) {
-      debugPrint('❌ Error loading offline routes: $e');
+      // debugPrint('❌ Error loading offline routes: $e');
       return [];
     }
   }
@@ -116,12 +116,12 @@ class OfflineStorageService {
       );
 
       if (success) {
-        debugPrint('✅ Route deleted from offline storage');
+        // debugPrint('✅ Route deleted from offline storage');
       }
 
       return success;
     } catch (e) {
-      debugPrint('❌ Error deleting offline route: $e');
+      // debugPrint('❌ Error deleting offline route: $e');
       return false;
     }
   }
@@ -137,7 +137,7 @@ class OfflineStorageService {
     required DateTime updatedAt,
   }) async {
     try {
-      debugPrint('💾 [OFFLINE] Attempting to save conversation: $title (ID: $id)');
+      // debugPrint('💾 [OFFLINE] Attempting to save conversation: $title (ID: $id)');
       final prefs = await SharedPreferences.getInstance();
 
       // Get existing conversations
@@ -145,7 +145,7 @@ class OfflineStorageService {
       final List<dynamic> conversations = conversationsJson != null
           ? jsonDecode(conversationsJson) as List<dynamic>
           : [];
-      debugPrint('💾 [OFFLINE] Current conversation count: ${conversations.length}');
+      // debugPrint('💾 [OFFLINE] Current conversation count: ${conversations.length}');
 
       // Create conversation object
       final conversation = {
@@ -165,7 +165,7 @@ class OfflineStorageService {
 
       // Keep only the most recent conversations
       if (conversations.length > _maxConversations) {
-        debugPrint('💾 [OFFLINE] Cleaning up old conversations (${conversations.length} > $_maxConversations)');
+        // debugPrint('💾 [OFFLINE] Cleaning up old conversations (${conversations.length} > $_maxConversations)');
         // Remove old conversations and their messages
         for (int i = _maxConversations; i < conversations.length; i++) {
           final oldId = conversations[i]['id'] as String;
@@ -181,15 +181,15 @@ class OfflineStorageService {
       );
 
       if (success) {
-        debugPrint('✅ [OFFLINE] Conversation "$title" saved to offline storage successfully!');
+        // debugPrint('✅ [OFFLINE] Conversation "$title" saved to offline storage successfully!');
       } else {
-        debugPrint('❌ [OFFLINE] Failed to save conversation "$title"');
+        // debugPrint('❌ [OFFLINE] Failed to save conversation "$title"');
       }
 
       return success;
     } catch (e, stackTrace) {
-      debugPrint('❌ [OFFLINE] Error saving conversation to offline storage: $e');
-      debugPrint('❌ [OFFLINE] Stack trace: $stackTrace');
+      // debugPrint('❌ [OFFLINE] Error saving conversation to offline storage: $e');
+      // debugPrint('❌ [OFFLINE] Stack trace: $stackTrace');
       return false;
     }
   }
@@ -234,7 +234,7 @@ class OfflineStorageService {
 
       return success;
     } catch (e) {
-      debugPrint('❌ Error saving conversation messages: $e');
+      // debugPrint('❌ Error saving conversation messages: $e');
       return false;
     }
   }
@@ -252,7 +252,7 @@ class OfflineStorageService {
       final List<dynamic> conversations = jsonDecode(conversationsJson) as List<dynamic>;
       return conversations.map((c) => c as Map<String, dynamic>).toList();
     } catch (e) {
-      debugPrint('❌ Error loading offline conversations: $e');
+      // debugPrint('❌ Error loading offline conversations: $e');
       return [];
     }
   }
@@ -289,7 +289,7 @@ class OfflineStorageService {
         );
       }).toList();
     } catch (e) {
-      debugPrint('❌ Error loading offline conversation messages: $e');
+      // debugPrint('❌ Error loading offline conversation messages: $e');
       return [];
     }
   }
@@ -297,24 +297,24 @@ class OfflineStorageService {
   /// Get offline storage statistics
   static Future<Map<String, dynamic>> getStorageStats() async {
     try {
-      debugPrint('📊 [OFFLINE] Loading storage statistics...');
+      // debugPrint('📊 [OFFLINE] Loading storage statistics...');
       final prefs = await SharedPreferences.getInstance();
 
       // Count routes
       final routesJson = prefs.getString(_savedRoutesKey);
-      debugPrint('📊 [OFFLINE] Routes data exists: ${routesJson != null}');
+      // debugPrint('📊 [OFFLINE] Routes data exists: ${routesJson != null}');
       final routesCount = routesJson != null
           ? (jsonDecode(routesJson) as List).length
           : 0;
-      debugPrint('📊 [OFFLINE] Routes count: $routesCount');
+      // debugPrint('📊 [OFFLINE] Routes count: $routesCount');
 
       // Count conversations
       final conversationsJson = prefs.getString(_conversationsKey);
-      debugPrint('📊 [OFFLINE] Conversations data exists: ${conversationsJson != null}');
+      // debugPrint('📊 [OFFLINE] Conversations data exists: ${conversationsJson != null}');
       final conversationsCount = conversationsJson != null
           ? (jsonDecode(conversationsJson) as List).length
           : 0;
-      debugPrint('📊 [OFFLINE] Conversations count: $conversationsCount');
+      // debugPrint('📊 [OFFLINE] Conversations count: $conversationsCount');
 
       // Calculate approximate storage size
       int totalSize = 0;
@@ -337,8 +337,8 @@ class OfflineStorageService {
           }
         }
       }
-      debugPrint('📊 [OFFLINE] Message keys found: $messageKeysCount');
-      debugPrint('📊 [OFFLINE] Total storage size: ${(totalSize / 1024).toStringAsFixed(2)} KB');
+      // debugPrint('📊 [OFFLINE] Message keys found: $messageKeysCount');
+      // debugPrint('📊 [OFFLINE] Total storage size: ${(totalSize / 1024).toStringAsFixed(2)} KB');
 
       final stats = {
         'routesCount': routesCount,
@@ -347,11 +347,11 @@ class OfflineStorageService {
         'totalSizeKB': (totalSize / 1024).toStringAsFixed(2),
       };
 
-      debugPrint('✅ [OFFLINE] Storage stats loaded successfully');
+      // debugPrint('✅ [OFFLINE] Storage stats loaded successfully');
       return stats;
     } catch (e, stackTrace) {
-      debugPrint('❌ [OFFLINE] Error getting storage stats: $e');
-      debugPrint('❌ [OFFLINE] Stack trace: $stackTrace');
+      // debugPrint('❌ [OFFLINE] Error getting storage stats: $e');
+      // debugPrint('❌ [OFFLINE] Stack trace: $stackTrace');
       return {
         'routesCount': 0,
         'conversationsCount': 0,
@@ -380,10 +380,10 @@ class OfflineStorageService {
         }
       }
 
-      debugPrint('✅ All offline data cleared');
+      // debugPrint('✅ All offline data cleared');
       return true;
     } catch (e) {
-      debugPrint('❌ Error clearing offline data: $e');
+      // debugPrint('❌ Error clearing offline data: $e');
       return false;
     }
   }

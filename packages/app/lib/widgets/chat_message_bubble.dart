@@ -40,7 +40,7 @@ class ChatMessageBubble extends StatelessWidget {
         '🎨 ChatMessageBubble: isUser=$isUser, hasError=${message.hasError}, hasLocations=${message.hasLocations}, hasRoute=${message.hasRoute}, showMapAction=$showMapAction',
       );
       if (message.metadata != null) {
-        debugPrint('   Metadata keys: ${message.metadata!.keys.join(", ")}');
+        // debugPrint('   Metadata keys: ${message.metadata!.keys.join(", ")}');
       }
     }
 
@@ -477,7 +477,7 @@ class ChatMessageBubble extends StatelessWidget {
           try {
             return RouteOption.fromJson(data as Map<String, dynamic>);
           } catch (e) {
-            debugPrint('⚠️ Failed to parse route option: $e');
+            // debugPrint('⚠️ Failed to parse route option: $e');
             return null;
           }
         })

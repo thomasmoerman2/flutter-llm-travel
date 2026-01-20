@@ -96,15 +96,15 @@ class _RootLayoutState extends State<RootLayout> {
 
   /// Show locations on map with route
   void _showLocationsOnMap(List<LocationData> locations, RouteType? routeType) {
-    debugPrint('🗺️ RootLayout._showLocationsOnMap called with ${locations.length} locations');
-    debugPrint('   Route type: ${routeType?.name ?? "none"}');
+    // debugPrint('🗺️ RootLayout._showLocationsOnMap called with ${locations.length} locations');
+    // debugPrint('   Route type: ${routeType?.name ?? "none"}');
 
     if (_isSidebarOpen) {
-      debugPrint('   Closing sidebar first');
+      // debugPrint('   Closing sidebar first');
       _closeSidebar();
     }
 
-    debugPrint('   Switching to map tab (index 1)');
+    // debugPrint('   Switching to map tab (index 1)');
     setState(() {
       _currentIndex = 1;
       _displayedLocations = locations;
@@ -112,13 +112,13 @@ class _RootLayoutState extends State<RootLayout> {
     });
 
     final mapState = _mapPageKey.currentState;
-    debugPrint('   Map state is ${mapState != null ? "available" : "NULL"}');
+    // debugPrint('   Map state is ${mapState != null ? "available" : "NULL"}');
 
     if (routeType != null) {
-      debugPrint('✅ Calling showRouteOnMap on map');
+      // debugPrint('✅ Calling showRouteOnMap on map');
       _mapPageKey.currentState?.showRouteOnMap(locations, routeType);
     } else {
-      debugPrint('✅ Calling showLocationsOnMap on map');
+      // debugPrint('✅ Calling showLocationsOnMap on map');
       _mapPageKey.currentState?.showLocationsOnMap(locations);
     }
   }

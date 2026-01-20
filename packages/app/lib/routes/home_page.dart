@@ -91,7 +91,7 @@ class HomePageContentState extends State<HomePageContent>
     });
 
     try {
-      debugPrint('🔍 Checking API availability at ${EnvConfig.apiBaseUrl}');
+      // debugPrint('🔍 Checking API availability at ${EnvConfig.apiBaseUrl}');
 
       // Try to connect to the base URL or a known endpoint
       // We'll use a simple GET to the base URL with a short timeout
@@ -120,7 +120,7 @@ class HomePageContentState extends State<HomePageContent>
         });
       }
     } catch (e) {
-      debugPrint('❌ API check failed: $e');
+      // debugPrint('❌ API check failed: $e');
       if (mounted) {
         setState(() {
           _isApiAvailable = false;
@@ -134,13 +134,13 @@ class HomePageContentState extends State<HomePageContent>
   Future<void> refreshModelPreference() async {
     final newModel = await PreferencesService.getSelectedModel();
     if (mounted && newModel != _currentModel) {
-      debugPrint('🔄 Model changed from $_currentModel to $newModel');
+      // debugPrint('🔄 Model changed from $_currentModel to $newModel');
 
       // Update ChatService to use new model
       try {
         if (_conversationId != null) {
           await _chatService.switchModel(newModel);
-          debugPrint('✅ ChatService switched to $newModel');
+          // debugPrint('✅ ChatService switched to $newModel');
         } else {
           // If conversation not initialized yet, just update the model
           // It will use the new model when initialized
@@ -149,7 +149,7 @@ class HomePageContentState extends State<HomePageContent>
           );
         }
       } catch (e) {
-        debugPrint('⚠️ Error switching model: $e');
+        // debugPrint('⚠️ Error switching model: $e');
       }
 
       setState(() {
@@ -207,7 +207,7 @@ class HomePageContentState extends State<HomePageContent>
         _isInitialized = true;
       });
     } catch (e) {
-      debugPrint('Error initializing chat: $e');
+      // debugPrint('Error initializing chat: $e');
       setState(() {
         _isInitialized = true;
       });
@@ -261,7 +261,7 @@ class HomePageContentState extends State<HomePageContent>
             }
           },
           onError: (error) {
-            debugPrint('⚠️ Firestore listener error: $error');
+            // debugPrint('⚠️ Firestore listener error: $error');
             // If index missing, show helpful message
             if (error.toString().contains('requires an index')) {
               debugPrint(
@@ -362,7 +362,7 @@ class HomePageContentState extends State<HomePageContent>
 
       if (user != null) {
         // Logged-in user: Use ChatService (saves to Firestore)
-        debugPrint('💬 Sending message: $text');
+        // debugPrint('💬 Sending message: $text');
         final hadNoConversation = _conversationId == null;
         final conversationId = await _chatService.ensureConversation(
           _currentModel,
@@ -378,13 +378,13 @@ class HomePageContentState extends State<HomePageContent>
           _subscribeToConversation(conversationId);
         }
         await _chatService.sendMessage(text);
-        debugPrint('✅ Message sent successfully');
+        // debugPrint('✅ Message sent successfully');
       } else {
         // Guest user: Handle messages locally
         await _handleGuestMessage();
       }
     } catch (e) {
-      debugPrint('Error sending message: $e');
+      // debugPrint('Error sending message: $e');
       _showError('Failed to send message: ${e.toString()}');
     } finally {
       if (mounted) {
@@ -421,17 +421,17 @@ class HomePageContentState extends State<HomePageContent>
   }
 
   void _handleShowOnMap(ChatMessage message) {
-    debugPrint('🗺️ _handleShowOnMap called');
+    // debugPrint('🗺️ _handleShowOnMap called');
     final callback = widget.onShowOnMap;
     if (callback == null) {
-      debugPrint('❌ No onShowOnMap callback provided');
+      // debugPrint('❌ No onShowOnMap callback provided');
       return;
     }
 
     final locations = _extractLocations(message);
-    debugPrint('📍 Extracted ${locations.length} locations from message');
+    // debugPrint('📍 Extracted ${locations.length} locations from message');
     if (locations.isEmpty) {
-      debugPrint('❌ No locations found in message metadata');
+      // debugPrint('❌ No locations found in message metadata');
       _showError('No locations found for this response.');
       return;
     }
@@ -443,25 +443,25 @@ class HomePageContentState extends State<HomePageContent>
     }
 
     final routeType = _extractRouteType(message);
-    debugPrint('🛣️ Route type: ${routeType?.name ?? "none"}');
-    debugPrint('✅ Calling onShowOnMap callback');
+    // debugPrint('🛣️ Route type: ${routeType?.name ?? "none"}');
+    // debugPrint('✅ Calling onShowOnMap callback');
     callback(locations, routeType);
   }
 
   void _handleSelectRouteOption(RouteOption option) {
-    debugPrint('📍 Route option selected: ${option.name}');
-    debugPrint('   ${option.locations.length} locations in this option');
+    // debugPrint('📍 Route option selected: ${option.name}');
+    // debugPrint('   ${option.locations.length} locations in this option');
 
     final callback = widget.onShowOnMap;
     if (callback == null) {
-      debugPrint('❌ No onShowOnMap callback provided');
+      // debugPrint('❌ No onShowOnMap callback provided');
       return;
     }
 
     // Auto-detect route type based on locations
     final routeType = MapboxDirectionsService.detectRouteType(option.locations);
-    debugPrint('🛣️ Detected route type: ${routeType.name}');
-    debugPrint('✅ Calling onShowOnMap callback with route option');
+    // debugPrint('🛣️ Detected route type: ${routeType.name}');
+    // debugPrint('✅ Calling onShowOnMap callback with route option');
     callback(option.locations, routeType);
   }
 
