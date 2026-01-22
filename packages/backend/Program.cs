@@ -2,7 +2,7 @@
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
-    .MinimumLevel.Debug()
+    .MinimumLevel.Warning()
     .CreateLogger();
 
 DotEnv.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
