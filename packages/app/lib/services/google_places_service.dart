@@ -104,8 +104,8 @@ class GooglePlacesService {
         ).replace(queryParameters: params);
 
         // debugPrint(
-          '🔍 Searching Google Places: $placeType near ($latitude, $longitude)',
-        );
+        //   '🔍 Searching Google Places: $placeType near ($latitude, $longitude)',
+        // );
 
         final response = await http
             .get(url)
@@ -130,8 +130,8 @@ class GooglePlacesService {
 
             if (results.isNotEmpty) {
               // debugPrint(
-                '✅ Found ${results.length} places for type "$placeType"',
-              );
+              //   '✅ Found ${results.length} places for type "$placeType"',
+              // );
               return results;
             }
           } else if (status == 'ZERO_RESULTS') {
