@@ -1,19 +1,19 @@
 // Configure Serilog bootstrap logger for early startup logging
+using Microsoft.AspNetCore.DataProtection;
+
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
     .MinimumLevel.Warning()
     .CreateLogger();
 
-DotEnv.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
-
 var builder = WebApplication.CreateBuilder(args);
-builder.Configuration.Sources.Clear();
-builder.Configuration.AddEnvironmentVariables();
 
 // Clear default providers and use Serilog
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(Log.Logger);
+builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo("/app/keys"));
+builder.Configuration.AddJsonFile("/app/keys/appsettings.Production.json", optional: true, reloadOnChange: true);
 
 string? firebaseJson = builder.Configuration["FirebaseCredentials"];
 var firebaseConfig = builder.Configuration.GetSection("FirebaseCredentials");
