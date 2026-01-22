@@ -12,6 +12,7 @@ Minimal API for travel/AI model requests. The API is mounted at runtime by ASP.N
   - UI: `/swagger/index.html`
   - JSON: `/swagger/v1/swagger.json`
 
+
 ## Headers
 - Common:
   - `Accept: application/json`

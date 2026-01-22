@@ -1,8 +1,10 @@
 // Configure Serilog bootstrap logger for early startup logging
+using Microsoft.AspNetCore.DataProtection;
+
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
-    .MinimumLevel.Debug()
+    .MinimumLevel.Warning()
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,15 +12,18 @@ var builder = WebApplication.CreateBuilder(args);
 // Clear default providers and use Serilog
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(Log.Logger);
+builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo("/app/keys"));
+builder.Configuration.AddJsonFile("/app/keys/appsettings.Production.json", optional: true, reloadOnChange: true);
 
+string? firebaseJson = builder.Configuration["FirebaseCredentials"];
 var firebaseConfig = builder.Configuration.GetSection("FirebaseCredentials");
-if (firebaseConfig.Exists() && firebaseConfig.GetChildren().Any()) // FirebaseConfig
+if (!string.IsNullOrWhiteSpace(firebaseJson) ||
+    (firebaseConfig.Exists() && firebaseConfig.GetChildren().Any())) // FirebaseConfig
 {
     Log.Information("[X] FirebaseCredentials : Found");
     try
     {
-        // Serialize the configuration section to JSON
-        string json = System.Text.Json.JsonSerializer.Serialize(
+        string json = firebaseJson ?? System.Text.Json.JsonSerializer.Serialize(
             firebaseConfig.Get<Dictionary<string, object>>()
         );
         // Initialize Firebase with credentials
@@ -39,7 +44,12 @@ else
     Log.Information("[ ] FirebaseCredentials : null");
 }
 
-string corsEnv = builder.Configuration["CORS"];
+string? corsEnv = builder.Configuration["CORS"];
+string[] corsOrigins = Array.Empty<string>();
+if (!string.IsNullOrWhiteSpace(corsEnv))
+{
+    corsOrigins = corsEnv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("MyCORS", builder =>
@@ -51,9 +61,16 @@ builder.Services.AddCors(options =>
     });
     options.AddPolicy("production", builder =>
     {
-        builder.AllowAnyOrigin()
-            .WithOrigins(corsEnv)
-            .WithMethods("GET", "POST", "DELETE")
+        if (corsOrigins.Length == 0)
+        {
+            builder.AllowAnyOrigin();
+        }
+        else
+        {
+            builder.WithOrigins(corsOrigins);
+        }
+
+        builder.WithMethods("GET", "POST", "DELETE")
            .WithHeaders("X-MCT-Header", "Authorization", "Content-Type");
     });
 });
