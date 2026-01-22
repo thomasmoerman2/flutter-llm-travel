@@ -118,19 +118,19 @@ class ChatService {
       await _currentAIService!.initialize();
       _currentModel = newModel;
     } catch (e) {
-      debugPrint('⚠️ Failed to initialize $newModel: $e');
+      // debugPrint('⚠️ Failed to initialize $newModel: $e');
 
       // If model initialization fails and it's an unavailable model,
       // fallback to ChatGPT for viewing conversation
       if (isUnavailable) {
-        debugPrint('🔄 Falling back to ChatGPT for conversation viewing...');
+        // debugPrint('🔄 Falling back to ChatGPT for conversation viewing...');
         _currentAIService = AIServiceFactory.createService(
           'ChatGPT',
           sessionId: _currentConversationId,
         );
         await _currentAIService!.initialize();
         _currentModel = 'ChatGPT'; // Use ChatGPT as active model
-        debugPrint('✅ Fallback successful - conversation opened with ChatGPT');
+        // debugPrint('✅ Fallback successful - conversation opened with ChatGPT');
       } else {
         // For other models, rethrow the error
         rethrow;
@@ -219,12 +219,12 @@ class ChatService {
       }
 
       final parsed = LocationParser.parseLocationsAndRoute(fullResponse);
-      debugPrint('🗺️ Parsed locations: ${parsed.locations.length} found');
+      // debugPrint('🗺️ Parsed locations: ${parsed.locations.length} found');
       if (parsed.locations.isNotEmpty) {
-        debugPrint('📍 Location details: ${parsed.locations.map((l) => l.name).join(", ")}');
+        // debugPrint('📍 Location details: ${parsed.locations.map((l) => l.name).join(", ")}');
       }
       if (parsed.routeType != null) {
-        debugPrint('🛣️ Route type: ${parsed.routeType!.name}');
+        // debugPrint('🛣️ Route type: ${parsed.routeType!.name}');
       }
 
       final cleanedText = parsed.cleanedText.trim();
@@ -238,14 +238,14 @@ class ChatService {
 
       // Check if we have multiple route options
       if (parsed.hasMultipleOptions && parsed.routeOptions != null) {
-        debugPrint('🔀 Multiple route options found: ${parsed.routeOptions!.length}');
+        // debugPrint('🔀 Multiple route options found: ${parsed.routeOptions!.length}');
         responseMetadata['routeOptions'] =
             parsed.routeOptions!.map((option) => option.toJson()).toList();
-        debugPrint('✅ Added route options to metadata');
+        // debugPrint('✅ Added route options to metadata');
       } else if (parsed.locations.isNotEmpty) {
         responseMetadata['locations'] =
             parsed.locations.map((location) => location.toJson()).toList();
-        debugPrint('✅ Added locations to metadata');
+        // debugPrint('✅ Added locations to metadata');
 
         // Calculate route details if we have multiple locations
         if (parsed.locations.length >= 2) {
@@ -254,7 +254,7 @@ class ChatService {
             final routeType = parsed.routeType ??
                 MapboxDirectionsService.detectRouteType(parsed.locations);
 
-            debugPrint('📏 Calculating route details with ${routeType.displayName}...');
+            // debugPrint('📏 Calculating route details with ${routeType.displayName}...');
             final routeInfo = await MapboxDirectionsService.calculateRoute(
               waypoints: parsed.locations,
               routeType: routeType,
@@ -271,9 +271,9 @@ class ChatService {
             responseMetadata['transportMode'] = routeType.displayName;
             responseMetadata['transportEmoji'] = routeType.emoji;
 
-            debugPrint('✅ Route details calculated: ${routeInfo.distanceFormatted}, ${routeInfo.durationFormatted}');
+            // debugPrint('✅ Route details calculated: ${routeInfo.distanceFormatted}, ${routeInfo.durationFormatted}');
           } catch (e) {
-            debugPrint('⚠️ Could not calculate route details: $e');
+            // debugPrint('⚠️ Could not calculate route details: $e');
             // Still save routeType if it was detected
             if (parsed.routeType != null) {
               responseMetadata['routeType'] = parsed.routeType!.name;
@@ -284,7 +284,7 @@ class ChatService {
       if (parsed.routeType != null && parsed.locations.length < 2) {
         // Single location but route type was mentioned - just save the type
         responseMetadata['routeType'] = parsed.routeType!.name;
-        debugPrint('✅ Added routeType to metadata');
+        // debugPrint('✅ Added routeType to metadata');
       }
 
       final finalMessage = aiMessage.copyWith(

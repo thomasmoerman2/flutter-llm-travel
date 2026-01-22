@@ -59,7 +59,7 @@
     "troubleshooting": "Dépannage",
     "help_check_internet": "Vérifiez votre connexion Internet",
     "help_check_server": "Assurez-vous que le serveur backend fonctionne sur localhost:5189",
-    "help_check_env": "Vérifiez API_BASE_URL et WS_BASE_URL dans le fichier .env"
+    "help_check_env": "Vérifiez API_BASE_URL dans le fichier .env"
   },
   "map": {
     "input_placeholder": "Où voudrais-tu aller?",

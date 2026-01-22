@@ -61,20 +61,20 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadOfflineStats() async {
-    debugPrint('📊 [SETTINGS] Loading offline stats...');
+    // debugPrint('📊 [SETTINGS] Loading offline stats...');
     setState(() {
       _isLoadingOfflineStats = true;
     });
 
     final stats = await OfflineStorageService.getStorageStats();
-    debugPrint('📊 [SETTINGS] Received stats: $stats');
+    // debugPrint('📊 [SETTINGS] Received stats: $stats');
 
     if (mounted) {
       setState(() {
         _offlineStats = stats;
         _isLoadingOfflineStats = false;
       });
-      debugPrint('📊 [SETTINGS] Stats updated in UI');
+      // debugPrint('📊 [SETTINGS] Stats updated in UI');
     }
   }
 
@@ -123,16 +123,16 @@ class _SettingsPageState extends State<SettingsPage> {
     int conversationsDownloaded = 0;
 
     try {
-      debugPrint('📥 Starting offline data download...');
+      // debugPrint('📥 Starting offline data download...');
 
       // Download all saved routes
-      debugPrint('📥 Fetching routes from Firestore...');
+      // debugPrint('📥 Fetching routes from Firestore...');
       final routesSnapshot = await FirebaseFirestore.instance
           .collection('savedRoutes')
           .where('userId', isEqualTo: user.uid)
           .get();
 
-      debugPrint('📥 Found ${routesSnapshot.docs.length} routes');
+      // debugPrint('📥 Found ${routesSnapshot.docs.length} routes');
 
       for (final doc in routesSnapshot.docs) {
         final data = doc.data();
@@ -155,16 +155,16 @@ class _SettingsPageState extends State<SettingsPage> {
         routesDownloaded++;
       }
 
-      debugPrint('✅ Downloaded $routesDownloaded routes');
+      // debugPrint('✅ Downloaded $routesDownloaded routes');
 
       // Download all conversations
-      debugPrint('📥 Fetching conversations from Firestore...');
+      // debugPrint('📥 Fetching conversations from Firestore...');
       final firestoreAccess = FirestoreAccess();
       final conversations = await firestoreAccess
           .getConversations(user.uid)
           .first;
 
-      debugPrint('📥 Found ${conversations.length} conversations');
+      // debugPrint('📥 Found ${conversations.length} conversations');
 
       // Limit to 10 most recent conversations
       final conversationsToDownload = conversations.take(10).toList();
@@ -193,7 +193,7 @@ class _SettingsPageState extends State<SettingsPage> {
         conversationsDownloaded++;
       }
 
-      debugPrint('✅ Downloaded $conversationsDownloaded conversations');
+      // debugPrint('✅ Downloaded $conversationsDownloaded conversations');
 
       // Reload stats
       await _loadOfflineStats();
@@ -208,7 +208,7 @@ class _SettingsPageState extends State<SettingsPage> {
         'Downloaded $routesDownloaded routes and $conversationsDownloaded conversations',
       );
     } catch (e) {
-      debugPrint('❌ Error downloading data: $e');
+      // debugPrint('❌ Error downloading data: $e');
 
       if (!mounted) return;
 

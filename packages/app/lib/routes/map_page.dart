@@ -129,7 +129,7 @@ class MapPageContentState extends State<MapPageContent> {
     _placesCircleManager = await mapboxMap.annotations
         .createCircleAnnotationManager();
 
-    // debugPrint('✅ Map annotation managers created');
+    // // debugPrint('✅ Map annotation managers created');
     _applyPendingMapUpdate();
   }
 
@@ -291,16 +291,16 @@ class MapPageContentState extends State<MapPageContent> {
 
   /// Suggest nearby places using Google Places API based on route locations
   Future<void> _suggestNearbyPlaces() async {
-    // debugPrint('🟠 _suggestNearbyPlaces() called');
-    // debugPrint('   Current locations count: ${_currentLocations.length}');
+    // // debugPrint('🟠 _suggestNearbyPlaces() called');
+    // // debugPrint('   Current locations count: ${_currentLocations.length}');
 
     if (_mapboxMap == null) {
-      // debugPrint('❌ Map not initialized');
+      // // debugPrint('❌ Map not initialized');
       return;
     }
 
     if (_currentLocations.isEmpty) {
-      // debugPrint('⚠️ No locations to search around');
+      // // debugPrint('⚠️ No locations to search around');
       return;
     }
 
@@ -324,7 +324,7 @@ class MapPageContentState extends State<MapPageContent> {
       debugPrint(
         '🔍 Fetching places near route center at ($centerLat, $centerLng)',
       );
-      // debugPrint('   Route has ${_currentLocations.length} locations:');
+      // // debugPrint('   Route has ${_currentLocations.length} locations:');
       for (var i = 0; i < _currentLocations.length; i++) {
         final loc = _currentLocations[i];
         debugPrint(
@@ -336,23 +336,23 @@ class MapPageContentState extends State<MapPageContent> {
       List<PlaceResult> places = [];
 
       // Strategy 1: Try 500m radius with time-based types
-      // debugPrint('🔍 Strategy 1: Searching within 500m radius...');
+      // // debugPrint('🔍 Strategy 1: Searching within 500m radius...');
       places = await GooglePlacesService.searchNearby(
         latitude: centerLat,
         longitude: centerLng,
         radius: 500,
       );
-      // debugPrint('   Found ${places.length} places');
+      // // debugPrint('   Found ${places.length} places');
 
       // Strategy 2: If no results, try 1000m radius
       if (places.isEmpty) {
-        // debugPrint('🔍 Strategy 2: Expanding to 1000m radius...');
+        // // debugPrint('🔍 Strategy 2: Expanding to 1000m radius...');
         places = await GooglePlacesService.searchNearby(
           latitude: centerLat,
           longitude: centerLng,
           radius: 1000,
         );
-        // debugPrint('   Found ${places.length} places');
+        // // debugPrint('   Found ${places.length} places');
       }
 
       // Strategy 3: If still no results, try 2000m with popular places
@@ -365,21 +365,21 @@ class MapPageContentState extends State<MapPageContent> {
           longitude: centerLng,
           radius: 2000,
         );
-        // debugPrint('   Found ${places.length} places');
+        // // debugPrint('   Found ${places.length} places');
       }
 
       // Strategy 4: If still nothing, try 5000m radius (tourist attractions, landmarks)
       if (places.isEmpty) {
-        // debugPrint('🔍 Strategy 4: Searching for landmarks within 5000m...');
+        // // debugPrint('🔍 Strategy 4: Searching for landmarks within 5000m...');
         places = await GooglePlacesService.searchNearby(
           latitude: centerLat,
           longitude: centerLng,
           radius: 5000,
         );
-        // debugPrint('   Found ${places.length} places');
+        // // debugPrint('   Found ${places.length} places');
       }
 
-      // debugPrint('✅ Total places found: ${places.length}');
+      // // debugPrint('✅ Total places found: ${places.length}');
 
       setState(() {
         _placeSuggestions = places;
@@ -387,15 +387,15 @@ class MapPageContentState extends State<MapPageContent> {
       });
 
       if (places.isNotEmpty) {
-        // debugPrint('🟠 Calling _showPlacesOnMap with ${places.length} places');
+        // // debugPrint('🟠 Calling _showPlacesOnMap with ${places.length} places');
         await _showPlacesOnMap(places);
 
-        // debugPrint('🟠 Calling _fitCameraToPlaces');
+        // // debugPrint('🟠 Calling _fitCameraToPlaces');
         await _fitCameraToPlaces(places);
 
-        // debugPrint('✅ Successfully showed ${places.length} place markers');
+        // // debugPrint('✅ Successfully showed ${places.length} place markers');
       } else {
-        // debugPrint('⚠️ No places found even after all strategies');
+        // // debugPrint('⚠️ No places found even after all strategies');
         if (!mounted) return;
         _showNoPlacesFoundDialog();
       }
@@ -425,15 +425,15 @@ class MapPageContentState extends State<MapPageContent> {
   /// Show place markers on the map with tap listeners
   Future<void> _showPlacesOnMap(List<PlaceResult> places) async {
     if (_placesAnnotationManager == null) {
-      // debugPrint('❌ Places annotation manager is null!');
+      // // debugPrint('❌ Places annotation manager is null!');
       return;
     }
 
-    // debugPrint('🟠 Clearing old place markers...');
+    // // debugPrint('🟠 Clearing old place markers...');
     await _placesAnnotationManager!.deleteAll();
     await _placesLabelAnnotationManager?.deleteAll();
 
-    // debugPrint('🟠 Creating ${places.length} orange place markers...');
+    // // debugPrint('🟠 Creating ${places.length} orange place markers...');
     final annotations = <PointAnnotationOptions>[];
     final labelAnnotations = <PointAnnotationOptions>[];
 
@@ -454,32 +454,32 @@ class MapPageContentState extends State<MapPageContent> {
           iconColor: 0xFFFF6B35, // Vibrant orange
         );
         annotations.add(annotation);
-        // debugPrint('   ✓ Annotation $i created');
+        // // debugPrint('   ✓ Annotation $i created');
       } catch (e) {
-        // debugPrint('   ✗ Error creating annotation $i: $e');
+        // // debugPrint('   ✗ Error creating annotation $i: $e');
       }
     }
 
-    // debugPrint('🟠 Total annotations to create: ${annotations.length}');
+    // // debugPrint('🟠 Total annotations to create: ${annotations.length}');
 
     final createdAnnotations = await _placesAnnotationManager!.createMulti(
       annotations,
     );
-    // debugPrint('✅ Created ${createdAnnotations.length} point annotations');
+    // // debugPrint('✅ Created ${createdAnnotations.length} point annotations');
 
     if (createdAnnotations.isEmpty && places.isNotEmpty) {
-      // debugPrint('⚠️ WARNING: Places exist but no point markers created!');
+      // // debugPrint('⚠️ WARNING: Places exist but no point markers created!');
     }
 
     if (labelAnnotations.isNotEmpty && _placesLabelAnnotationManager != null) {
       final createdLabels = await _placesLabelAnnotationManager!.createMulti(
         labelAnnotations,
       );
-      // debugPrint('✅ Created ${createdLabels.length} place emoji labels');
+      // // debugPrint('✅ Created ${createdLabels.length} place emoji labels');
     }
 
     // ALSO create circle markers as backup (we know these work)
-    // debugPrint('🔵 Creating backup circle markers...');
+    // // debugPrint('🔵 Creating backup circle markers...');
     if (_placesCircleManager != null) {
       await _placesCircleManager!.deleteAll();
 
@@ -502,7 +502,7 @@ class MapPageContentState extends State<MapPageContent> {
       final createdCircles = await _placesCircleManager!.createMulti(
         circleAnnotations,
       );
-      // debugPrint('✅ Created ${createdCircles.length} orange circle markers');
+      // // debugPrint('✅ Created ${createdCircles.length} orange circle markers');
     }
 
     // Verify markers are still there after creation
@@ -527,7 +527,7 @@ class MapPageContentState extends State<MapPageContent> {
           for (final place in _placeSuggestions) {
             if ((place.longitude - tappedCoords.lng).abs() < 0.0001 &&
                 (place.latitude - tappedCoords.lat).abs() < 0.0001) {
-              // debugPrint('🟠 Place marker tapped: ${place.name}');
+              // // debugPrint('🟠 Place marker tapped: ${place.name}');
               _showPlaceDetailsModal(place);
               break;
             }
@@ -545,7 +545,7 @@ class MapPageContentState extends State<MapPageContent> {
             for (final place in _placeSuggestions) {
               if ((place.longitude - tappedCoords.lng).abs() < 0.0001 &&
                   (place.latitude - tappedCoords.lat).abs() < 0.0001) {
-                // debugPrint('🟠 Circle marker tapped: ${place.name}');
+                // // debugPrint('🟠 Circle marker tapped: ${place.name}');
                 _showPlaceDetailsModal(place);
                 break;
               }
@@ -840,7 +840,7 @@ class MapPageContentState extends State<MapPageContent> {
 
     // Auto-optimize route if we have 3+ locations
     if (updatedLocations.length >= 3) {
-      // debugPrint('🔧 Auto-optimizing route...');
+      // // debugPrint('🔧 Auto-optimizing route...');
       updatedLocations = MapboxDirectionsService.optimizeRoute(
         updatedLocations,
       );
@@ -1072,7 +1072,7 @@ class MapPageContentState extends State<MapPageContent> {
   }
 
   Future<void> _clearMapOverlays({bool preservePlaces = false}) async {
-    // debugPrint('🧹 Clearing map overlays (preservePlaces: $preservePlaces)...');
+    // // debugPrint('🧹 Clearing map overlays (preservePlaces: $preservePlaces)...');
     await _pointAnnotationManager?.deleteAll();
     await _circleAnnotationManager?.deleteAll();
     await _labelAnnotationManager?.deleteAll();
@@ -1083,24 +1083,24 @@ class MapPageContentState extends State<MapPageContent> {
       await _placesAnnotationManager?.deleteAll();
       await _placesCircleManager?.deleteAll();
       await _placesLabelAnnotationManager?.deleteAll();
-      // debugPrint('   Cleared place markers');
+      // // debugPrint('   Cleared place markers');
     } else {
-      // debugPrint('   Preserved place markers');
+      // // debugPrint('   Preserved place markers');
     }
 
-    // debugPrint('✅ Map overlays cleared');
+    // // debugPrint('✅ Map overlays cleared');
   }
 
   Future<void> _showLocationMarkers(List<LocationData> locations) async {
     if (_circleAnnotationManager == null || _labelAnnotationManager == null) {
-      // debugPrint('❌ Circle or label annotation manager is null');
+      // // debugPrint('❌ Circle or label annotation manager is null');
       return;
     }
 
     // Store current locations for tap handling
     _currentLocations = locations;
 
-    // debugPrint('📍 Creating ${locations.length} numbered markers with labels');
+    // // debugPrint('📍 Creating ${locations.length} numbered markers with labels');
     final circleAnnotations = <CircleAnnotationOptions>[];
     final labelAnnotations = <PointAnnotationOptions>[];
     final numberAnnotations = <PointAnnotationOptions>[];
@@ -1185,7 +1185,7 @@ class MapPageContentState extends State<MapPageContent> {
             // Check if coordinates match (with small tolerance for floating point)
             if ((location.longitude - tappedCoords.lng).abs() < 0.0001 &&
                 (location.latitude - tappedCoords.lat).abs() < 0.0001) {
-              // debugPrint('📍 Marker tapped: ${location.name}');
+              // // debugPrint('📍 Marker tapped: ${location.name}');
               _showLocationDetails(location);
               break;
             }
@@ -1266,7 +1266,7 @@ class MapPageContentState extends State<MapPageContent> {
 
         if (await canLaunchUrl(appleMapsUri)) {
           await launchUrl(appleMapsUri, mode: LaunchMode.externalApplication);
-          // debugPrint('✅ Launched Apple Maps');
+          // // debugPrint('✅ Launched Apple Maps');
           return;
         }
       }
@@ -1277,12 +1277,12 @@ class MapPageContentState extends State<MapPageContent> {
 
       if (await canLaunchUrl(googleMapsUri)) {
         await launchUrl(googleMapsUri, mode: LaunchMode.externalApplication);
-        // debugPrint('✅ Launched Google Maps');
+        // // debugPrint('✅ Launched Google Maps');
       } else {
         throw Exception('No map app available');
       }
     } catch (e) {
-      // debugPrint('❌ Failed to launch navigation: $e');
+      // // debugPrint('❌ Failed to launch navigation: $e');
       if (!mounted) return;
 
       showCupertinoDialog(
@@ -1496,7 +1496,7 @@ class MapPageContentState extends State<MapPageContent> {
       return;
     }
 
-    // debugPrint('📷 Fitting camera to ${locations.length} location(s)');
+    // // debugPrint('📷 Fitting camera to ${locations.length} location(s)');
     for (var i = 0; i < locations.length; i++) {
       debugPrint(
         '   [$i] ${locations[i].name}: ${locations[i].latitude}, ${locations[i].longitude}',
@@ -1505,7 +1505,7 @@ class MapPageContentState extends State<MapPageContent> {
 
     if (locations.length == 1) {
       final location = locations.first;
-      // debugPrint('📍 Single location - zooming to level 12');
+      // // debugPrint('📍 Single location - zooming to level 12');
       await _mapboxMap!.flyTo(
         CameraOptions(
           center: Point(
@@ -1517,7 +1517,7 @@ class MapPageContentState extends State<MapPageContent> {
         ),
         MapAnimationOptions(duration: 1000, startDelay: 0),
       );
-      // debugPrint('✅ Camera moved to single location');
+      // // debugPrint('✅ Camera moved to single location');
       return;
     }
 
@@ -1533,7 +1533,7 @@ class MapPageContentState extends State<MapPageContent> {
       if (location.latitude > maxLat) maxLat = location.latitude;
     }
 
-    // debugPrint('📐 Bounds: Lng[$minLng, $maxLng], Lat[$minLat, $maxLat]');
+    // // debugPrint('📐 Bounds: Lng[$minLng, $maxLng], Lat[$minLat, $maxLat]');
 
     final padding = 0.1;
     final lngPadding = (maxLng - minLng) * padding;
@@ -1546,7 +1546,7 @@ class MapPageContentState extends State<MapPageContent> {
       maxLat - minLat + latPadding * 2,
     );
 
-    // debugPrint('📷 Camera center: ($centerLat, $centerLng), zoom: $zoomLevel');
+    // // debugPrint('📷 Camera center: ($centerLat, $centerLng), zoom: $zoomLevel');
 
     await _mapboxMap!.flyTo(
       CameraOptions(
@@ -1557,7 +1557,7 @@ class MapPageContentState extends State<MapPageContent> {
       ),
       MapAnimationOptions(duration: 1500, startDelay: 0),
     );
-    // debugPrint('✅ Camera fitted to all locations');
+    // // debugPrint('✅ Camera fitted to all locations');
   }
 
   /// Fit camera to show all search results
@@ -2079,10 +2079,10 @@ class MapPageContentState extends State<MapPageContent> {
     debugPrint(
       '🗺️ MapPage.showLocationsOnMap called with ${locations.length} locations',
     );
-    // debugPrint('   Map ready: $_isMapReady');
+    // // debugPrint('   Map ready: $_isMapReady');
 
     if (!_isMapReady) {
-      // debugPrint('⏳ Map not ready, saving as pending');
+      // // debugPrint('⏳ Map not ready, saving as pending');
       _pendingReset = false;
       _pendingLocations = locations;
       _pendingRouteType = null;
@@ -2091,31 +2091,31 @@ class MapPageContentState extends State<MapPageContent> {
     }
 
     if (!mounted) {
-      // debugPrint('❌ Widget not mounted');
+      // // debugPrint('❌ Widget not mounted');
       return;
     }
     if (locations.isEmpty) {
-      // debugPrint('❌ No locations to show');
+      // // debugPrint('❌ No locations to show');
       return;
     }
 
-    // debugPrint('🧹 Clearing search UI');
+    // // debugPrint('🧹 Clearing search UI');
     setState(() {
       _showResults = false;
       _showSuggestions = false;
     });
 
-    // debugPrint('🧹 Clearing existing map overlays (preserving places)');
+    // // debugPrint('🧹 Clearing existing map overlays (preserving places)');
     await _clearMapOverlays(preservePlaces: true);
-    // debugPrint('📍 Adding ${locations.length} location markers');
+    // // debugPrint('📍 Adding ${locations.length} location markers');
     await _showLocationMarkers(locations);
 
     // Small delay to ensure markers are rendered before zooming
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // debugPrint('📷 Fitting camera to locations');
+    // // debugPrint('📷 Fitting camera to locations');
     await _fitCameraToLocations(locations);
-    // debugPrint('✅ Locations displayed on map');
+    // // debugPrint('✅ Locations displayed on map');
     widget.onRouteDisplayed?.call(locations, null);
   }
 
@@ -2126,11 +2126,11 @@ class MapPageContentState extends State<MapPageContent> {
     debugPrint(
       '🗺️ MapPage.showRouteOnMap called with ${locations.length} locations',
     );
-    // debugPrint('   Route type: ${routeType.name}');
-    // debugPrint('   Map ready: $_isMapReady');
+    // // debugPrint('   Route type: ${routeType.name}');
+    // // debugPrint('   Map ready: $_isMapReady');
 
     if (!_isMapReady) {
-      // debugPrint('⏳ Map not ready, saving as pending');
+      // // debugPrint('⏳ Map not ready, saving as pending');
       _pendingReset = false;
       _pendingLocations = locations;
       _pendingRouteType = routeType;
@@ -2139,54 +2139,54 @@ class MapPageContentState extends State<MapPageContent> {
     }
 
     if (!mounted) {
-      // debugPrint('❌ Widget not mounted');
+      // // debugPrint('❌ Widget not mounted');
       return;
     }
     if (locations.isEmpty) {
-      // debugPrint('❌ No locations to show');
+      // // debugPrint('❌ No locations to show');
       return;
     }
 
-    // debugPrint('🧹 Clearing search UI');
+    // // debugPrint('🧹 Clearing search UI');
     setState(() {
       _showResults = false;
       _showSuggestions = false;
     });
 
     if (locations.length < 2) {
-      // debugPrint('ℹ️ Only 1 location, showing as marker instead of route');
+      // // debugPrint('ℹ️ Only 1 location, showing as marker instead of route');
       await showLocationsOnMap(locations);
       return;
     }
 
-    // debugPrint('🧹 Clearing existing map overlays (preserving places)');
+    // // debugPrint('🧹 Clearing existing map overlays (preserving places)');
     await _clearMapOverlays(preservePlaces: true);
-    // debugPrint('📍 Adding ${locations.length} location markers');
+    // // debugPrint('📍 Adding ${locations.length} location markers');
     await _showLocationMarkers(locations);
 
     try {
-      // debugPrint('🛣️ Calculating route with Mapbox...');
+      // // debugPrint('🛣️ Calculating route with Mapbox...');
       final route = await MapboxDirectionsService.calculateRoute(
         waypoints: locations,
         routeType: routeType,
       );
-      // debugPrint('✅ Route calculated successfully');
-      // debugPrint('📏 Drawing route on map');
+      // // debugPrint('✅ Route calculated successfully');
+      // // debugPrint('📏 Drawing route on map');
       await _drawRoute(route);
 
       // Small delay to ensure route is rendered before zooming
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // debugPrint('📷 Fitting camera to locations');
+      // // debugPrint('📷 Fitting camera to locations');
       await _fitCameraToLocations(locations);
-      // debugPrint('✅ Route displayed on map');
+      // // debugPrint('✅ Route displayed on map');
     } catch (e) {
-      // debugPrint('❌ Route calculation failed: $e');
+      // // debugPrint('❌ Route calculation failed: $e');
 
       // Small delay before zooming
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // debugPrint('📷 Fitting camera to locations (without route)');
+      // // debugPrint('📷 Fitting camera to locations (without route)');
       await _fitCameraToLocations(locations);
     }
     widget.onRouteDisplayed?.call(locations, routeType);
@@ -2267,7 +2267,7 @@ class MapPageContentState extends State<MapPageContent> {
                               );
                               reorderableLocations.insert(newIndex, item);
                             });
-                            // debugPrint('🔄 Reordered: $oldIndex -> $newIndex');
+                            // // debugPrint('🔄 Reordered: $oldIndex -> $newIndex');
                           },
                           itemBuilder: (context, index) {
                             final location = reorderableLocations[index];
@@ -2848,7 +2848,7 @@ class MapPageContentState extends State<MapPageContent> {
       }
       return null;
     } catch (e) {
-      // debugPrint('❌ Error checking existing route: $e');
+      // // debugPrint('❌ Error checking existing route: $e');
       return null;
     }
   }
@@ -2926,12 +2926,12 @@ class MapPageContentState extends State<MapPageContent> {
     String?
     existingDocId, // If provided, update this document instead of creating new
   ) async {
-    // debugPrint('💾 Saving route: $name with ${locations.length} locations');
+    // // debugPrint('💾 Saving route: $name with ${locations.length} locations');
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        // debugPrint('❌ User not logged in, cannot save route');
+        // // debugPrint('❌ User not logged in, cannot save route');
         return;
       }
 
@@ -2952,7 +2952,7 @@ class MapPageContentState extends State<MapPageContent> {
             .collection('savedRoutes')
             .doc(existingDocId)
             .update(routeData);
-        // debugPrint('✅ Route updated: $name');
+        // // debugPrint('✅ Route updated: $name');
 
         // Update offline storage
         await OfflineStorageService.saveRoute(
@@ -2970,7 +2970,7 @@ class MapPageContentState extends State<MapPageContent> {
             .collection('savedRoutes')
             .add(routeData);
 
-        // debugPrint('✅ Route saved to Firestore successfully');
+        // // debugPrint('✅ Route saved to Firestore successfully');
 
         // Also save to offline storage for offline access
         await OfflineStorageService.saveRoute(
@@ -2982,10 +2982,10 @@ class MapPageContentState extends State<MapPageContent> {
           updatedAt: now,
         );
 
-        // debugPrint('✅ Route also saved to offline storage');
+        // // debugPrint('✅ Route also saved to offline storage');
       }
     } catch (e) {
-      // debugPrint('❌ Error saving route: $e');
+      // // debugPrint('❌ Error saving route: $e');
       if (!mounted) return;
       showCupertinoDialog(
         context: context,
@@ -3240,7 +3240,7 @@ class MapPageContentState extends State<MapPageContent> {
     String routeId,
     Map<String, dynamic> routeData,
   ) async {
-    // debugPrint('📍 Loading saved route: ${routeData['name']}');
+    // // debugPrint('📍 Loading saved route: ${routeData['name']}');
 
     try {
       final locationsData = routeData['locations'] as List<dynamic>;
@@ -3263,9 +3263,9 @@ class MapPageContentState extends State<MapPageContent> {
         await showLocationsOnMap(locations);
       }
 
-      // debugPrint('✅ Route loaded successfully');
+      // // debugPrint('✅ Route loaded successfully');
     } catch (e) {
-      // debugPrint('❌ Error loading route: $e');
+      // // debugPrint('❌ Error loading route: $e');
       if (!mounted) return;
       showCupertinoDialog(
         context: context,
@@ -3311,9 +3311,9 @@ class MapPageContentState extends State<MapPageContent> {
           .doc(routeId)
           .delete();
 
-      // debugPrint('✅ Route deleted successfully');
+      // // debugPrint('✅ Route deleted successfully');
     } catch (e) {
-      // debugPrint('❌ Error deleting route: $e');
+      // // debugPrint('❌ Error deleting route: $e');
       if (!mounted) return;
       showCupertinoDialog(
         context: context,

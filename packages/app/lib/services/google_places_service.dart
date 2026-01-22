@@ -69,14 +69,14 @@ class GooglePlacesService {
     final apiKey = EnvConfig.get('GOOGLE_PLACES_API_KEY');
 
     // Detailed API key debugging
-    debugPrint('🔍 Google Places API Key Check:');
-    debugPrint('   - Key exists: ${apiKey != null}');
-    debugPrint('   - Key length: ${apiKey?.length ?? 0}');
-    debugPrint('   - Key preview: ${apiKey != null && apiKey.length > 10 ? "${apiKey.substring(0, 10)}..." : "TOO_SHORT_OR_NULL"}');
+    // // debugPrint('🔍 Google Places API Key Check:');
+    // // debugPrint('   - Key exists: ${apiKey != null}');
+    // // debugPrint('   - Key length: ${apiKey?.length ?? 0}');
+    // // debugPrint('   - Key preview: ${apiKey != null && apiKey.length > 10 ? "${apiKey.substring(0, 10)}..." : "TOO_SHORT_OR_NULL"}');
 
     if (apiKey == null || apiKey.isEmpty) {
-      debugPrint('❌ Google Places API key not found in .env');
-      debugPrint('💡 Make sure GOOGLE_PLACES_API_KEY is set in your .env file');
+      // // debugPrint('❌ Google Places API key not found in .env');
+      // // debugPrint('💡 Make sure GOOGLE_PLACES_API_KEY is set in your .env file');
       throw Exception('Google Places API key not configured');
     }
 
@@ -103,9 +103,9 @@ class GooglePlacesService {
           '$_baseUrl/nearbysearch/json',
         ).replace(queryParameters: params);
 
-        debugPrint(
-          '🔍 Searching Google Places: $placeType near ($latitude, $longitude)',
-        );
+        // debugPrint(
+        //   '🔍 Searching Google Places: $placeType near ($latitude, $longitude)',
+        // );
 
         final response = await http
             .get(url)
@@ -129,24 +129,24 @@ class GooglePlacesService {
                 .toList();
 
             if (results.isNotEmpty) {
-              debugPrint(
-                '✅ Found ${results.length} places for type "$placeType"',
-              );
+              // debugPrint(
+              //   '✅ Found ${results.length} places for type "$placeType"',
+              // );
               return results;
             }
           } else if (status == 'ZERO_RESULTS') {
-            debugPrint('⚠️ No results for type "$placeType", trying next...');
+            // // debugPrint('⚠️ No results for type "$placeType", trying next...');
             continue;
           } else {
             // Log full error details from Google
-            debugPrint('❌ Google Places API error: $status');
-            debugPrint('📄 Full API response: ${response.body}');
+            // // debugPrint('❌ Google Places API error: $status');
+            // // debugPrint('📄 Full API response: ${response.body}');
 
             if (status == 'REQUEST_DENIED') {
               final errorMessage = data['error_message'] as String?;
-              debugPrint('🔴 REQUEST_DENIED details: $errorMessage');
-              debugPrint('🔑 API Key (first 10 chars): ${apiKey.substring(0, apiKey.length > 10 ? 10 : apiKey.length)}...');
-              debugPrint('🌐 Request URL (without key): ${url.toString().replaceAll(apiKey, "***KEY***")}');
+              // // debugPrint('🔴 REQUEST_DENIED details: $errorMessage');
+              // // debugPrint('🔑 API Key (first 10 chars): ${apiKey.substring(0, apiKey.length > 10 ? 10 : apiKey.length)}...');
+              // // debugPrint('🌐 Request URL (without key): ${url.toString().replaceAll(apiKey, "***KEY***")}');
 
               throw Exception(
                 'Google Places API request denied.\n'
@@ -160,17 +160,17 @@ class GooglePlacesService {
             }
           }
         } else {
-          debugPrint('❌ Google Places request failed: ${response.statusCode}');
-          debugPrint('📄 Response body: ${response.body}');
+          // // debugPrint('❌ Google Places request failed: ${response.statusCode}');
+          // // debugPrint('📄 Response body: ${response.body}');
           throw Exception('Places search failed: ${response.statusCode}');
         }
       }
 
       // No results found for any type
-      debugPrint('⚠️ No places found for any type');
+      // // debugPrint('⚠️ No places found for any type');
       return [];
     } catch (e) {
-      debugPrint('❌ Google Places error: $e');
+      // // debugPrint('❌ Google Places error: $e');
       rethrow;
     }
   }
@@ -213,7 +213,7 @@ class GooglePlacesService {
 
       return null;
     } catch (e) {
-      debugPrint('❌ Place details error: $e');
+      // // debugPrint('❌ Place details error: $e');
       return null;
     }
   }

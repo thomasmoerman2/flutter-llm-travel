@@ -64,14 +64,14 @@ class RestAIService implements AIService {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        debugPrint('⚠️ No authenticated user found');
+        // debugPrint('⚠️ No authenticated user found');
         return null;
       }
       final token = await user.getIdToken();
-      debugPrint('✅ Firebase token retrieved for user: ${user.uid}');
+      // debugPrint('✅ Firebase token retrieved for user: ${user.uid}');
       return token;
     } catch (e) {
-      debugPrint('❌ Failed to get Firebase token: $e');
+      // debugPrint('❌ Failed to get Firebase token: $e');
       return null;
     }
   }
@@ -79,7 +79,7 @@ class RestAIService implements AIService {
   @override
   Future<void> initialize() async {
     // No initialization needed for REST API
-    debugPrint('✅ REST AI service initialized for $model');
+    // debugPrint('✅ REST AI service initialized for $model');
   }
 
   @override
@@ -188,8 +188,8 @@ Remember: Include ALL locations you mention with their REAL coordinates!
       // Prepare request body matching NEW backend API format
       final requestBody = {'message': completeMessage};
 
-      debugPrint('📤 Sending REST request to: $apiUrl');
-      debugPrint('📝 Request body: ${jsonEncode(requestBody)}');
+      // debugPrint('📤 Sending REST request to: $apiUrl');
+      // debugPrint('📝 Request body: ${jsonEncode(requestBody)}');
 
       // Get Firebase authentication token
       final token = await _getFirebaseToken();
@@ -214,7 +214,7 @@ Remember: Include ALL locations you mention with their REAL coordinates!
           .timeout(
             Duration(seconds: responseTimeout),
             onTimeout: () {
-              debugPrint('⏱️ REST request timeout after ${responseTimeout}s');
+              // debugPrint('⏱️ REST request timeout after ${responseTimeout}s');
               throw AIServiceException(
                 'Response timeout after $responseTimeout seconds. Please try again.',
                 code: 'TIMEOUT',
@@ -229,7 +229,7 @@ Remember: Include ALL locations you mention with their REAL coordinates!
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body) as Map<String, dynamic>;
-        debugPrint('📥 Response data keys: ${responseData.keys.join(", ")}');
+        // debugPrint('📥 Response data keys: ${responseData.keys.join(", ")}');
 
         // Update metadata
         _lastMetadata = {
@@ -255,7 +255,7 @@ Remember: Include ALL locations you mention with their REAL coordinates!
           );
         }
 
-        debugPrint('✅ Response complete (${content.length} chars)');
+        // debugPrint('✅ Response complete (${content.length} chars)');
 
         // For Hybrid model, pass response to Apple Intelligence for refinement
         if (model.toLowerCase() == 'hybrid' && Platform.isIOS) {
@@ -305,8 +305,8 @@ Enhanced response:''';
             // Clean up
             await appleService.dispose();
           } catch (e) {
-            debugPrint('❌ Failed to refine with Apple Intelligence: $e');
-            debugPrint('⚠️ Falling back to hybrid response without refinement');
+            // debugPrint('❌ Failed to refine with Apple Intelligence: $e');
+            // debugPrint('⚠️ Falling back to hybrid response without refinement');
             yield content;
           }
         } else {
@@ -315,32 +315,32 @@ Enhanced response:''';
         }
       } else if (response.statusCode == 400) {
         final errorData = jsonDecode(response.body) as Map<String, dynamic>;
-        debugPrint('❌ Bad request (400): ${errorData['error']}');
+        // debugPrint('❌ Bad request (400): ${errorData['error']}');
         throw AIServiceException(
           errorData['error'] ?? 'Bad request',
           code: 'BAD_REQUEST',
         );
       } else if (response.statusCode == 500) {
-        debugPrint('❌ Server error (500): API key not configured');
+        // debugPrint('❌ Server error (500): API key not configured');
         throw AIServiceException(
           'Server error: ${model.toUpperCase()} API key not configured',
           code: 'SERVER_ERROR',
         );
       } else if (response.statusCode == 503) {
-        debugPrint('❌ Service unavailable (503)');
+        // debugPrint('❌ Service unavailable (503)');
         throw AIServiceException(
           '${model.toUpperCase()} service is currently unavailable',
           code: 'SERVICE_UNAVAILABLE',
         );
       } else if (response.statusCode == 504) {
-        debugPrint('❌ Gateway timeout (504)');
+        // debugPrint('❌ Gateway timeout (504)');
         throw AIServiceException(
           'Request to ${model.toUpperCase()} timed out',
           code: 'GATEWAY_TIMEOUT',
         );
       } else {
-        debugPrint('❌ REST request failed with status ${response.statusCode}');
-        debugPrint('Response body: ${response.body}');
+        // debugPrint('❌ REST request failed with status ${response.statusCode}');
+        // debugPrint('Response body: ${response.body}');
 
         throw AIServiceException(
           'Server error: ${response.statusCode} - ${response.reasonPhrase}',
@@ -348,7 +348,7 @@ Enhanced response:''';
         );
       }
     } catch (e) {
-      debugPrint('❌ REST API error: $e');
+      // debugPrint('❌ REST API error: $e');
       if (e is AIServiceException) rethrow;
 
       throw AIServiceException(
@@ -376,6 +376,6 @@ Enhanced response:''';
   @override
   Future<void> dispose() async {
     // No resources to clean up for REST API
-    debugPrint('🗑️ REST AI service disposed');
+    // debugPrint('🗑️ REST AI service disposed');
   }
 }
