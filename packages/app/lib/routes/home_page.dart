@@ -9,6 +9,7 @@ import '../models/chat_message.dart';
 import '../services/chat_service.dart';
 import '../services/env_config.dart';
 import '../services/firestore_access.dart';
+import '../services/location_parser.dart';
 import '../services/preferences_service.dart';
 import '../services/theme_color.dart';
 import '../services/mapbox_directions_service.dart';
@@ -289,6 +290,119 @@ class HomePageContentState extends State<HomePageContent>
       _messages = [];
     });
     return true;
+  }
+
+  /// Start a new conversation with a pre-existing prompt and AI response
+  /// Used when selecting a result from the Compare page
+  Future<bool> startConversationWithResult(
+    String prompt,
+    String aiResponse,
+    String modelName,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _promptLoginRequired();
+      return false;
+    }
+
+    try {
+      // Reset any existing conversation
+      await _chatService.resetConversation();
+      _messagesSubscription?.cancel();
+
+      // Create new conversation
+      final conversationId = await _chatService.initializeConversation(modelName);
+
+      if (!mounted) return false;
+
+      // Create and save user message
+      final userMessage = ChatMessage(
+        id: '',
+        conversationId: conversationId,
+        userId: user.uid,
+        content: prompt,
+        role: MessageRole.user,
+        status: MessageStatus.sent,
+        model: modelName,
+        timestamp: DateTime.now(),
+      );
+      final userMessageId = await _firestore.addMessage(userMessage);
+      await _firestore.updateMessage(userMessage.copyWith(id: userMessageId));
+
+      // Parse locations from AI response
+      final parsed = LocationParser.parseLocationsAndRoute(aiResponse);
+      final cleanedText = parsed.cleanedText.trim();
+      final finalContent = cleanedText.isNotEmpty ? cleanedText : aiResponse.trim();
+
+      // Build metadata with locations
+      final responseMetadata = <String, dynamic>{
+        'model': modelName,
+        'source': 'compare',
+      };
+
+      if (parsed.hasMultipleOptions && parsed.routeOptions != null) {
+        responseMetadata['routeOptions'] =
+            parsed.routeOptions!.map((option) => option.toJson()).toList();
+      } else if (parsed.locations.isNotEmpty) {
+        responseMetadata['locations'] =
+            parsed.locations.map((location) => location.toJson()).toList();
+
+        // Calculate route details if we have multiple locations
+        if (parsed.locations.length >= 2) {
+          try {
+            final routeType = parsed.routeType ??
+                MapboxDirectionsService.detectRouteType(parsed.locations);
+            final routeInfo = await MapboxDirectionsService.calculateRoute(
+              waypoints: parsed.locations,
+              routeType: routeType,
+            );
+
+            responseMetadata['routeType'] = routeType.name;
+            responseMetadata['distance'] = routeInfo.distance;
+            responseMetadata['distanceKm'] = routeInfo.distanceKm;
+            responseMetadata['distanceFormatted'] = routeInfo.distanceFormatted;
+            responseMetadata['duration'] = routeInfo.duration;
+            responseMetadata['durationMin'] = routeInfo.durationMin;
+            responseMetadata['durationFormatted'] = routeInfo.durationFormatted;
+            responseMetadata['transportMode'] = routeType.displayName;
+            responseMetadata['transportEmoji'] = routeType.emoji;
+          } catch (e) {
+            if (parsed.routeType != null) {
+              responseMetadata['routeType'] = parsed.routeType!.name;
+            }
+          }
+        }
+      }
+
+      // Create and save AI message
+      final aiMessage = ChatMessage(
+        id: '',
+        conversationId: conversationId,
+        userId: user.uid,
+        content: finalContent,
+        role: MessageRole.assistant,
+        status: MessageStatus.sent,
+        model: modelName,
+        timestamp: DateTime.now().add(const Duration(milliseconds: 1)),
+        metadata: responseMetadata.isNotEmpty ? responseMetadata : null,
+      );
+      final aiMessageId = await _firestore.addMessage(aiMessage);
+      await _firestore.updateMessage(aiMessage.copyWith(id: aiMessageId));
+
+      if (!mounted) return false;
+
+      setState(() {
+        _currentModel = modelName;
+        _conversationId = conversationId;
+        _messages = [];
+      });
+
+      _subscribeToConversation(conversationId);
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error starting conversation with result: $e');
+      return false;
+    }
   }
 
   Future<void> openConversation(Conversation conversation) async {
