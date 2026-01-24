@@ -44,6 +44,12 @@ class BottomNavigation extends StatelessWidget {
                     const SizedBox(width: 16),
                     _NavButton(
                       icon: LucideIcons.map,
+                      isActive: currentIndex == 2,
+                      onTap: () => onTap(2),
+                    ),
+                    const SizedBox(width: 16),
+                    _NavButton(
+                      icon: LucideIcons.gitCompareArrows,
                       isActive: currentIndex == 1,
                       onTap: () => onTap(1),
                     ),

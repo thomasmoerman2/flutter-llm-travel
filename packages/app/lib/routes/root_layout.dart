@@ -9,6 +9,7 @@ import '../services/mapbox_directions_service.dart';
 import '../widgets/top_navigation_bar.dart';
 import '../widgets/bottom_navigation.dart';
 import '../widgets/conversation_sidebar.dart';
+import 'compare_page.dart';
 import 'home_page.dart';
 import 'map_page.dart';
 import 'settings_page.dart';
@@ -26,6 +27,8 @@ class _RootLayoutState extends State<RootLayout> {
   int _currentIndex = 0;
   final GlobalKey<HomePageContentState> _homePageKey =
       GlobalKey<HomePageContentState>();
+  final GlobalKey<ComparePageContentState> _comparePageKey =
+      GlobalKey<ComparePageContentState>();
   final GlobalKey<MapPageContentState> _mapPageKey =
       GlobalKey<MapPageContentState>();
   bool _isSidebarOpen = false;
@@ -94,6 +97,24 @@ class _RootLayoutState extends State<RootLayout> {
     _mapPageKey.currentState?.showSavedRoutesSheet();
   }
 
+  /// Handle when user selects a result from compare page
+  Future<void> _handleCompareResultSelected(String prompt, String response, String modelName) async {
+    final homeState = _homePageKey.currentState;
+    if (homeState != null) {
+      // Start a new conversation with the selected result
+      final success = await homeState.startConversationWithResult(prompt, response, modelName);
+      if (success && mounted) {
+        // Reset map when starting new conversation
+        _mapPageKey.currentState?.resetMap();
+        setState(() {
+          _currentIndex = 0;
+          _displayedLocations = [];
+          _displayedRouteType = null;
+        });
+      }
+    }
+  }
+
   /// Show locations on map with route
   void _showLocationsOnMap(List<LocationData> locations, RouteType? routeType) {
     // debugPrint('🗺️ RootLayout._showLocationsOnMap called with ${locations.length} locations');
@@ -104,15 +125,14 @@ class _RootLayoutState extends State<RootLayout> {
       _closeSidebar();
     }
 
-    // debugPrint('   Switching to map tab (index 1)');
+    // debugPrint('   Switching to map tab (index 2)');
     setState(() {
-      _currentIndex = 1;
+      _currentIndex = 2;
       _displayedLocations = locations;
       _displayedRouteType = routeType;
     });
 
-    final mapState = _mapPageKey.currentState;
-    // debugPrint('   Map state is ${mapState != null ? "available" : "NULL"}');
+    // debugPrint('   Map state is ${_mapPageKey.currentState != null ? "available" : "NULL"}');
 
     if (routeType != null) {
       // debugPrint('✅ Calling showRouteOnMap on map');
@@ -158,7 +178,7 @@ class _RootLayoutState extends State<RootLayout> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final sidebarWidth = math.min(screenWidth * 0.78, 320.0);
-    final isMapPage = _currentIndex == 1;
+    final isMapPage = _currentIndex == 2;
     final navHeight = 60.0 + MediaQuery.of(context).padding.bottom;
     final mapBottomInset = navHeight + 16.0;
 
@@ -170,6 +190,10 @@ class _RootLayoutState extends State<RootLayout> {
         HomePageContent(
           key: _homePageKey,
           onShowOnMap: _showLocationsOnMap,
+        ),
+        ComparePageContent(
+          key: _comparePageKey,
+          onSelectResult: _handleCompareResultSelected,
         ),
         MapPageContent(
           key: _mapPageKey,
