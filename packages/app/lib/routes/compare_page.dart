@@ -24,7 +24,8 @@ class CompareResult {
 
 /// Compare page that shows 3 AI results side by side
 class ComparePageContent extends StatefulWidget {
-  final void Function(String prompt, String selectedResponse, String modelName)? onSelectResult;
+  final void Function(String prompt, String selectedResponse, String modelName)?
+  onSelectResult;
 
   const ComparePageContent({super.key, this.onSelectResult});
 
@@ -146,7 +147,11 @@ class ComparePageContentState extends State<ComparePageContent> {
     }
   }
 
-  Future<void> _queryModel(String modelName, String prompt, String userId) async {
+  Future<void> _queryModel(
+    String modelName,
+    String prompt,
+    String userId,
+  ) async {
     try {
       final service = AIServiceFactory.createService(modelName);
       await service.initialize();
@@ -162,23 +167,27 @@ class ComparePageContentState extends State<ComparePageContent> {
       if (mounted) {
         setState(() {
           _loadingStates[modelName] = false;
-          _results.add(CompareResult(
-            modelName: modelName,
-            response: responseBuffer.toString(),
-            icon: _getModelIcon(modelName),
-          ));
+          _results.add(
+            CompareResult(
+              modelName: modelName,
+              response: responseBuffer.toString(),
+              icon: _getModelIcon(modelName),
+            ),
+          );
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _loadingStates[modelName] = false;
-          _results.add(CompareResult(
-            modelName: modelName,
-            response: 'Error: ${e.toString()}',
-            isError: true,
-            icon: _getModelIcon(modelName),
-          ));
+          _results.add(
+            CompareResult(
+              modelName: modelName,
+              response: 'Error: ${e.toString()}',
+              isError: true,
+              icon: _getModelIcon(modelName),
+            ),
+          );
         });
       }
     }
@@ -187,7 +196,11 @@ class ComparePageContentState extends State<ComparePageContent> {
   void _selectResult(CompareResult result) {
     if (result.isError || _currentPrompt == null) return;
 
-    widget.onSelectResult?.call(_currentPrompt!, result.response, result.modelName);
+    widget.onSelectResult?.call(
+      _currentPrompt!,
+      result.response,
+      result.modelName,
+    );
   }
 
   void _showLoginRequired() {
@@ -314,7 +327,7 @@ class ComparePageContentState extends State<ComparePageContent> {
                                   ),
                                 )
                               : const Icon(
-                                  LucideIcons.gitCompareArrows,
+                                  LucideIcons.send,
                                   size: 20,
                                   color: ThemeColor.textPrimary,
                                 ),
@@ -367,7 +380,10 @@ class ComparePageContentState extends State<ComparePageContent> {
             if (_isAppleIntelligenceAvailable) ...[
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: ThemeColor.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16),
@@ -375,11 +391,7 @@ class ComparePageContentState extends State<ComparePageContent> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      LucideIcons.cpu,
-                      size: 14,
-                      color: ThemeColor.primary,
-                    ),
+                    Icon(LucideIcons.cpu, size: 14, color: ThemeColor.primary),
                     SizedBox(width: 6),
                     Text(
                       'Apple Intelligence Available',
@@ -439,7 +451,9 @@ class ComparePageContentState extends State<ComparePageContent> {
           // Results
           ...models.map((model) {
             final isLoading = _loadingStates[model] ?? false;
-            final result = _results.where((r) => r.modelName == model).firstOrNull;
+            final result = _results
+                .where((r) => r.modelName == model)
+                .firstOrNull;
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -572,70 +586,70 @@ class _CompareResultCard extends StatelessWidget {
                     ],
                   )
                 : result != null
-                    ? result!.isError
-                        ? Text(
-                            result!.response,
-                            style: const TextStyle(
+                ? result!.isError
+                      ? Text(
+                          result!.response,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFFEF5350),
+                          ),
+                        )
+                      : MarkdownBody(
+                          data: _cleanMarkdownResponse(result!.response),
+                          styleSheet: MarkdownStyleSheet(
+                            p: const TextStyle(
                               fontSize: 14,
-                              color: Color(0xFFEF5350),
+                              color: ThemeColor.textPrimary,
+                              height: 1.4,
                             ),
-                          )
-                        : MarkdownBody(
-                            data: _cleanMarkdownResponse(result!.response),
-                            styleSheet: MarkdownStyleSheet(
-                              p: const TextStyle(
-                                fontSize: 14,
-                                color: ThemeColor.textPrimary,
-                                height: 1.4,
-                              ),
-                              strong: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: ThemeColor.textPrimary,
-                              ),
-                              em: const TextStyle(
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: ThemeColor.textPrimary,
-                              ),
-                              code: const TextStyle(
-                                fontSize: 12,
-                                fontFamily: 'monospace',
-                                backgroundColor: ThemeColor.background,
-                                color: ThemeColor.textPrimary,
-                              ),
-                              codeblockDecoration: BoxDecoration(
-                                color: ThemeColor.background,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              h1: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: ThemeColor.textPrimary,
-                              ),
-                              h2: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: ThemeColor.textPrimary,
-                              ),
-                              h3: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: ThemeColor.textPrimary,
-                              ),
-                              listBullet: const TextStyle(
-                                fontSize: 14,
-                                color: ThemeColor.textPrimary,
-                              ),
+                            strong: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: ThemeColor.textPrimary,
                             ),
-                          )
-                    : const Text(
-                        'Waiting...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: ThemeColor.textSecondary,
-                        ),
-                      ),
+                            em: const TextStyle(
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              color: ThemeColor.textPrimary,
+                            ),
+                            code: const TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                              backgroundColor: ThemeColor.background,
+                              color: ThemeColor.textPrimary,
+                            ),
+                            codeblockDecoration: BoxDecoration(
+                              color: ThemeColor.background,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            h1: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: ThemeColor.textPrimary,
+                            ),
+                            h2: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: ThemeColor.textPrimary,
+                            ),
+                            h3: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: ThemeColor.textPrimary,
+                            ),
+                            listBullet: const TextStyle(
+                              fontSize: 14,
+                              color: ThemeColor.textPrimary,
+                            ),
+                          ),
+                        )
+                : const Text(
+                    'Waiting...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: ThemeColor.textSecondary,
+                    ),
+                  ),
           ),
         ],
       ),
