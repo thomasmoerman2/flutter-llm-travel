@@ -3,7 +3,6 @@
 A research application investigating multi-model Large Language Model integration patterns for intelligent travel planning with real-time map visualization.
 
 **Author:** Thomas Moerman
-**Institution Research Project**
 
 ---
 
@@ -295,8 +294,3 @@ This structure supports research data export for:
 **Services:**
 - [Firebase](https://firebase.google.com/docs)
 - [Mapbox](https://docs.mapbox.com/)
-
-
-```
-Moerman, T. (2026). Multi-Model LLM Integration Research Platform.
-```
