@@ -1,3 +1,6 @@
+> 📚 This project was developed as part of my bachelor thesis (Jan–Apr 2026)
+> at Howest, de Hogeschool West-Vlaanderen.
+
 # Multi-Model LLM Integration Research Platform
 
 A research application investigating multi-model Large Language Model integration patterns for intelligent travel planning with real-time map visualization.
@@ -48,31 +51,35 @@ mono_research/
 
 ### Technology Stack
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Frontend | Flutter 3.10.4+ (Dart) | iOS mobile application |
-| Backend | .NET 9 / ASP.NET Core | RESTful API with streaming |
-| Authentication | Firebase Auth | JWT-based user management |
-| Database | Cloud Firestore | Real-time conversation storage |
-| Maps | Mapbox SDK | Geocoding, directions, visualization |
-| AI Models | OpenAI, Google GenAI, Apple Intelligence | Multi-model integration |
-| Containerization | Docker | Backend deployment |
+| Component        | Technology                               | Purpose                              |
+| ---------------- | ---------------------------------------- | ------------------------------------ |
+| Frontend         | Flutter 3.10.4+ (Dart)                   | iOS mobile application               |
+| Backend          | .NET 9 / ASP.NET Core                    | RESTful API with streaming           |
+| Authentication   | Firebase Auth                            | JWT-based user management            |
+| Database         | Cloud Firestore                          | Real-time conversation storage       |
+| Maps             | Mapbox SDK                               | Geocoding, directions, visualization |
+| AI Models        | OpenAI, Google GenAI, Apple Intelligence | Multi-model integration              |
+| Containerization | Docker                                   | Backend deployment                   |
 
 ### AI Model Integration
 
 **GPT-4o-mini (OpenAI)**
+
 - Primary model for structured JSON output
 - Fast inference, cost-effective
 
 **Gemini 2.5 Flash (Google)**
+
 - Alternative model for comparative analysis
 - Different reasoning patterns
 
 **Hybrid Mode**
+
 - Two-stage pipeline: GPT generates initial response, Gemini refines
 - Research focus on quality improvement vs latency trade-off
 
 **Apple Intelligence**
+
 - On-device iOS processing
 - Privacy-focused, offline capable
 
@@ -163,6 +170,7 @@ API_BASE_URL=http://localhost:5005
 ### Development Mode
 
 **Backend:**
+
 ```bash
 cd packages/backend
 dotnet run
@@ -171,12 +179,14 @@ dotnet run
 ```
 
 **iOS App:**
+
 ```bash
 cd packages/app
 flutter run
 ```
 
 **Both (parallel):**
+
 ```bash
 npm run dev
 ```
@@ -195,12 +205,12 @@ docker run -p 5005:5005 mono-research-backend
 
 ### Endpoints
 
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| GET | `/` | Health check | No |
-| POST | `/model/gpt` | GPT-4o-mini generation | Required |
-| POST | `/model/gemini` | Gemini 2.5 Flash generation | Required |
-| POST | `/model/hybrid` | Two-stage GPT→Gemini pipeline | Required |
+| Method | Path            | Description                   | Auth     |
+| ------ | --------------- | ----------------------------- | -------- |
+| GET    | `/`             | Health check                  | No       |
+| POST   | `/model/gpt`    | GPT-4o-mini generation        | Required |
+| POST   | `/model/gemini` | Gemini 2.5 Flash generation   | Required |
+| POST   | `/model/hybrid` | Two-stage GPT→Gemini pipeline | Required |
 
 ### Request Format
 
@@ -234,22 +244,26 @@ AI responses contain natural language with embedded JSON for location parsing:
 ## Project Features
 
 ### Conversation Interface
+
 - Real-time streaming responses with word-by-word display
 - Multi-conversation management with Firestore persistence
 - Model selection per conversation
 
 ### Map Visualization
+
 - Automatic marker placement from AI-generated coordinates
 - Multi-stop routing with Mapbox Directions API
 - Support for driving, walking, cycling routes
 - Camera auto-fitting to display all locations
 
 ### Model Comparison
+
 - Side-by-side comparison view for research analysis
 - Run identical queries against multiple models
 - Export results for empirical evaluation
 
 ### Internationalization
+
 - Dutch, English, French language support
 - Extensible localization system
 
@@ -274,28 +288,30 @@ conversations/{conversationId}
 ```
 
 This structure supports research data export for:
+
 - Response time analysis
 - Location accuracy verification
 - Model output comparison
 - Quality metric evaluation
-
 
 ---
 
 ## External References
 
 **Frameworks:**
+
 - [Flutter Documentation](https://docs.flutter.dev/)
 - [ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/)
 
 **AI APIs:**
+
 - [OpenAI API](https://platform.openai.com/docs/)
 - [Google AI for Developers](https://ai.google.dev/docs)
 
 **Services:**
+
 - [Firebase](https://firebase.google.com/docs)
 - [Mapbox](https://docs.mapbox.com/)
-
 
 ```
 Moerman, T. (2026). Multi-Model LLM Integration Research Platform.
