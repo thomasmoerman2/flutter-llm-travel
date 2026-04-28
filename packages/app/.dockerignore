@@ -1,0 +1,37 @@
+# Native platforms (not needed for web build)
+ios/
+android/
+macos/
+linux/
+windows/
+
+# Dart/Flutter build output
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Pub cache
+.pub-cache/
+.pub/
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.iml
+.metadata
+devtools_options.yaml
+
+# Git
+.git/
+.gitignore
+
+# Tests
+test/
+
+# Docs
+*.md
+MAPBOX.md
+BACKEND_PAYLOAD.md
+OFFLINE.md
