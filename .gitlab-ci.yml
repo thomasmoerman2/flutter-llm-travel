@@ -3,11 +3,14 @@ stages:
   - deploy
 
 variables:
-  DOCKER_TLS_CERTDIR: "" # ← This often fixes dind issues
+  DOCKER_TLS_CERTDIR: ""
   DOCKER_DRIVER: overlay2
 
   DOCKER_IMAGE_APP: $CI_REGISTRY_IMAGE/app
   CONTAINER_NAME_APP: research-app
+
+  DOCKER_IMAGE_BACKEND: $CI_REGISTRY_IMAGE/backend
+  CONTAINER_NAME_BACKEND: research-backend
 
 # ── BUILD FLUTTER WEB ─────────────────────────────────────────────────────
 build-app:
@@ -31,9 +34,34 @@ build-app:
         -t "$DOCKER_IMAGE_APP:$CI_COMMIT_SHORT_SHA" \
         -t "$DOCKER_IMAGE_APP:latest" \
         -f packages/app/Dockerfile \
-        .
+        packages/app
     - docker push "$DOCKER_IMAGE_APP:$CI_COMMIT_SHORT_SHA"
     - docker push "$DOCKER_IMAGE_APP:latest"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ── BUILD BACKEND ─────────────────────────────────────────────────────────
+build-backend:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  before_script:
+    - |
+      echo "$CI_REGISTRY_PASSWORD" | docker login \
+        --username "$CI_REGISTRY_USER" \
+        --password-stdin \
+        "$CI_REGISTRY"
+  script:
+    - |
+      docker build \
+        --cache-from "$DOCKER_IMAGE_BACKEND:latest" \
+        -t "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA" \
+        -t "$DOCKER_IMAGE_BACKEND:latest" \
+        -f packages/backend/Dockerfile \
+        packages/backend
+    - docker push "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA"
+    - docker push "$DOCKER_IMAGE_BACKEND:latest"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
@@ -50,7 +78,7 @@ deploy-app:
     - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
   script:
     - |
-      ssh "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+      ssh "$DEPLOY_USER@$DEPLOY_HOST" << EOF
         set -e
         echo "$CI_REGISTRY_PASSWORD" | docker login \
           --username "$CI_REGISTRY_USER" \
@@ -76,6 +104,49 @@ deploy-app:
 
         docker image prune -f
         echo "✅ Flutter Web App deployed!"
+      EOF
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ── DEPLOY BACKEND ────────────────────────────────────────────────────────
+deploy-backend:
+  stage: deploy
+  image: alpine:latest
+  needs: [build-backend]
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh "$DEPLOY_USER@$DEPLOY_HOST" << EOF
+        set -e
+        echo "$CI_REGISTRY_PASSWORD" | docker login \
+          --username "$CI_REGISTRY_USER" \
+          --password-stdin \
+          "$CI_REGISTRY"
+
+        docker pull "$DOCKER_IMAGE_BACKEND:latest"
+
+        docker stop "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
+        docker rm "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
+
+        docker run -d \
+          --name "$CONTAINER_NAME_BACKEND" \
+          --restart unless-stopped \
+          --network traefik \
+          -l "traefik.enable=true" \
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.rule=Host(\`$BACKEND_DOMAIN\`)" \
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.entrypoints=websecure" \
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls=true" \
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls.certresolver=letsencrypt" \
+          -l "traefik.http.services.$CONTAINER_NAME_BACKEND.loadbalancer.server.port=5005" \
+          "$DOCKER_IMAGE_BACKEND:latest"
+
+        docker image prune -f
+        echo "✅ Backend deployed!"
       EOF
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
