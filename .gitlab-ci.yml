@@ -3,79 +3,24 @@ stages:
   - deploy
 
 variables:
-  DOCKER_IMAGE_BACKEND: $CI_REGISTRY_IMAGE/backend
-  CONTAINER_NAME_BACKEND: research-backend
+  DOCKER_TLS_CERTDIR: "" # ← This often fixes dind issues
+  DOCKER_DRIVER: overlay2
 
   DOCKER_IMAGE_APP: $CI_REGISTRY_IMAGE/app
   CONTAINER_NAME_APP: research-app
 
-# ── BACKEND ────────────────────────────────────────────────────────────────
-build-backend:
-  stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-  script:
-    - |
-      docker build \
-        --cache-from "$DOCKER_IMAGE_BACKEND:latest" \
-        -t "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA" \
-        -t "$DOCKER_IMAGE_BACKEND:latest" \
-        -f packages/backend/Dockerfile \
-        packages/backend/
-    - docker push "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA"
-    - docker push "$DOCKER_IMAGE_BACKEND:latest"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-deploy-backend:
-  stage: deploy
-  image: alpine:latest
-  needs: [build-backend]
-  before_script:
-    - apk add --no-cache openssh-client
-    - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
-  script:
-    - |
-      ssh "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
-        set -e
-        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-        docker pull "$DOCKER_IMAGE_BACKEND:latest"
-
-        docker stop "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
-        docker rm "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
-
-        docker run -d \
-          --name "$CONTAINER_NAME_BACKEND" \
-          --restart unless-stopped \
-          --network traefik \
-          -e ASPNETCORE_ENVIRONMENT=Production \
-          -l "traefik.enable=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.rule=Host(\`$API_DOMAIN\`)" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.entrypoints=websecure" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls.certresolver=letsencrypt" \
-          -l "traefik.http.services.$CONTAINER_NAME_BACKEND.loadbalancer.server.port=5005" \
-          "$DOCKER_IMAGE_BACKEND:latest"
-
-        docker image prune -f
-      EOF
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-# ── FLUTTER WEB APP ───────────────────────────────────────────────────────
+# ── BUILD FLUTTER WEB ─────────────────────────────────────────────────────
 build-app:
   stage: build
   image: docker:27
   services:
     - docker:27-dind
   before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - |
+      echo "$CI_REGISTRY_PASSWORD" | docker login \
+        --username "$CI_REGISTRY_USER" \
+        --password-stdin \
+        "$CI_REGISTRY"
   script:
     - |
       docker build \
@@ -92,6 +37,7 @@ build-app:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
+# ── DEPLOY FLUTTER WEB ────────────────────────────────────────────────────
 deploy-app:
   stage: deploy
   image: alpine:latest
@@ -101,12 +47,16 @@ deploy-app:
     - eval $(ssh-agent -s)
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
   script:
     - |
       ssh "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
         set -e
-        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+        echo "$CI_REGISTRY_PASSWORD" | docker login \
+          --username "$CI_REGISTRY_USER" \
+          --password-stdin \
+          "$CI_REGISTRY"
+
         docker pull "$DOCKER_IMAGE_APP:latest"
 
         docker stop "$CONTAINER_NAME_APP" 2>/dev/null || true
@@ -125,6 +75,7 @@ deploy-app:
           "$DOCKER_IMAGE_APP:latest"
 
         docker image prune -f
+        echo "✅ Flutter Web App deployed!"
       EOF
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
