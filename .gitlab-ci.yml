@@ -1,30 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# GitLab CI/CD – Backend API (.NET 9) + Flutter Web App
-# Builds Docker images and deploys them via SSH to a self-hosted server
-# behind Traefik as reverse proxy.
-#
-# Required CI/CD variables (Settings → CI/CD → Variables):
-#
-#   SSH_PRIVATE_KEY          Private key for SSH access to the server (file / masked)
-#   SERVER_HOST              IP or hostname of the server
-#   SERVER_USER              SSH user on the server (e.g. deploy)
-#
-#   ── Backend ──────────────────────────────────────────────────────────────
-#   API_DOMAIN               Public domain for the API (e.g. api.example.com)
-#   CORS_ORIGINS             Allowed CORS origins (e.g. https://app.example.com)
-#   OPENAI_API_KEY           OpenAI API key (masked)
-#   GEMINI_API_KEY           Google Gemini API key (masked)
-#   FIREBASE_PROJECT_ID      Firebase project ID
-#   FIREBASE_PRIVATE_KEY_ID  Firebase private key ID
-#   FIREBASE_PRIVATE_KEY     Firebase private key (masked, file type recommended)
-#   FIREBASE_CLIENT_EMAIL    Firebase service account email
-#   FIREBASE_CLIENT_ID       Firebase client ID
-#
-#   ── Flutter App ──────────────────────────────────────────────────────────
-#   APP_DOMAIN               Public domain for the Flutter web app (e.g. app.example.com)
-#   API_BASE_URL             Backend API URL baked into the Flutter web build
-#   MAPBOX_ACCESS_TOKEN      Mapbox public token — pk.… (masked)
-#   GOOGLE_PLACES_API_KEY    Google Places API key (masked)
+# GitLab CI/CD – Monorepo: .NET 9 Backend + Flutter Web App
+# Builds Docker images → pushes to GitLab Registry → deploys via SSH + Traefik
 # ─────────────────────────────────────────────────────────────────────────────
 
 stages:
@@ -32,15 +8,15 @@ stages:
   - deploy
 
 variables:
-  DOCKER_IMAGE: $CI_REGISTRY_IMAGE/backend
-  CONTAINER_NAME: research-backend
-  APP_DOCKER_IMAGE: $CI_REGISTRY_IMAGE/app
-  APP_CONTAINER_NAME: research-app
+  DOCKER_IMAGE_BACKEND: $CI_REGISTRY_IMAGE/backend
+  CONTAINER_NAME_BACKEND: research-backend
+
+  DOCKER_IMAGE_APP: $CI_REGISTRY_IMAGE/app
+  CONTAINER_NAME_APP: research-app
+
   DOCKER_BUILDKIT: "1"
 
-# ── BACKEND BUILD ─────────────────────────────────────────────────────────────
-# Builds the multi-stage Docker image and pushes it to the GitLab Container
-# Registry, tagged with both the short commit SHA and 'latest'.
+# ── BACKEND ────────────────────────────────────────────────────────────────
 
 build-backend:
   stage: build
@@ -52,21 +28,18 @@ build-backend:
   script:
     - |
       docker build \
-        --cache-from "$DOCKER_IMAGE:latest" \
-        -t "$DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA" \
-        -t "$DOCKER_IMAGE:latest" \
+        --cache-from "$DOCKER_IMAGE_BACKEND:latest" \
+        -t "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA" \
+        -t "$DOCKER_IMAGE_BACKEND:latest" \
+        -f packages/backend/Dockerfile \
         packages/backend/
-    - docker push "$DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA"
-    - docker push "$DOCKER_IMAGE:latest"
+    - docker push "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA"
+    - docker push "$DOCKER_IMAGE_BACKEND:latest"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - packages/backend/**/*
         - .gitlab-ci.yml
-
-# ── BACKEND DEPLOY ────────────────────────────────────────────────────────────
-# SSHes into the server, pulls the new image and restarts the container.
-# Traefik picks up the labels automatically — no Traefik restart needed.
 
 deploy-backend:
   stage: deploy
@@ -83,22 +56,16 @@ deploy-backend:
     - ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
   script:
     - |
-      ssh "$SERVER_USER@$SERVER_HOST" << EOF
+      ssh "$SERVER_USER@$SERVER_HOST" << 'EOF'
         set -e
-
-        echo "Logging in to GitLab registry..."
         docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+        docker pull "$DOCKER_IMAGE_BACKEND:latest"
 
-        echo "Pulling image $DOCKER_IMAGE:latest..."
-        docker pull "$DOCKER_IMAGE:latest"
+        docker stop "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
+        docker rm "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
 
-        echo "Stopping and removing old container..."
-        docker stop "$CONTAINER_NAME" 2>/dev/null || true
-        docker rm   "$CONTAINER_NAME" 2>/dev/null || true
-
-        echo "Starting new container..."
         docker run -d \
-          --name "$CONTAINER_NAME" \
+          --name "$CONTAINER_NAME_BACKEND" \
           --restart unless-stopped \
           --network traefik \
           -e ASPNETCORE_ENVIRONMENT=Production \
@@ -115,17 +82,15 @@ deploy-backend:
           -e FirebaseCredentials__auth_uri=https://accounts.google.com/o/oauth2/auth \
           -e FirebaseCredentials__universe_domain=googleapis.com \
           -l "traefik.enable=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME.rule=Host(\`$API_DOMAIN\`)" \
-          -l "traefik.http.routers.$CONTAINER_NAME.entrypoints=websecure" \
-          -l "traefik.http.routers.$CONTAINER_NAME.tls=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME.tls.certresolver=letsencrypt" \
-          -l "traefik.http.services.$CONTAINER_NAME.loadbalancer.server.port=5005" \
-          "$DOCKER_IMAGE:latest"
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.rule=Host(\`$API_DOMAIN\`)" \
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.entrypoints=websecure" \
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls=true" \
+          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls.certresolver=letsencrypt" \
+          -l "traefik.http.services.$CONTAINER_NAME_BACKEND.loadbalancer.server.port=5005" \
+          "$DOCKER_IMAGE_BACKEND:latest"
 
-        echo "Cleaning up unused images..."
         docker image prune -f
-
-        echo "Backend deploy complete."
+        echo "Backend deployed successfully."
       EOF
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -133,10 +98,7 @@ deploy-backend:
         - packages/backend/**/*
         - .gitlab-ci.yml
 
-# ── APP BUILD ─────────────────────────────────────────────────────────────────
-# Builds the Flutter web app inside a multi-stage Docker image.
-# Env vars are baked in at build time via --build-arg (flutter_dotenv embeds
-# the .env file into the compiled JS bundle — no runtime injection possible).
+# ── FLUTTER WEB APP ───────────────────────────────────────────────────────
 
 build-app:
   stage: build
@@ -148,24 +110,21 @@ build-app:
   script:
     - |
       docker build \
-        --cache-from "$APP_DOCKER_IMAGE:latest" \
+        --cache-from "$DOCKER_IMAGE_APP:latest" \
         --build-arg API_BASE_URL="$API_BASE_URL" \
         --build-arg MAPBOX_ACCESS_TOKEN="$MAPBOX_ACCESS_TOKEN" \
         --build-arg GOOGLE_PLACES_API_KEY="$GOOGLE_PLACES_API_KEY" \
-        -t "$APP_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA" \
-        -t "$APP_DOCKER_IMAGE:latest" \
-        packages/app/
-    - docker push "$APP_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA"
-    - docker push "$APP_DOCKER_IMAGE:latest"
+        -t "$DOCKER_IMAGE_APP:$CI_COMMIT_SHORT_SHA" \
+        -t "$DOCKER_IMAGE_APP:latest" \
+        -f packages/app/Dockerfile \
+        .
+    - docker push "$DOCKER_IMAGE_APP:$CI_COMMIT_SHORT_SHA"
+    - docker push "$DOCKER_IMAGE_APP:latest"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - packages/app/**/*
         - .gitlab-ci.yml
-
-# ── APP DEPLOY ────────────────────────────────────────────────────────────────
-# SSHes into the server, pulls the new image and restarts the nginx container.
-# Traefik handles TLS termination and forwards HTTP to port 80 inside the container.
 
 deploy-app:
   stage: deploy
@@ -182,36 +141,28 @@ deploy-app:
     - ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
   script:
     - |
-      ssh "$SERVER_USER@$SERVER_HOST" << EOF
+      ssh "$SERVER_USER@$SERVER_HOST" << 'EOF'
         set -e
-
-        echo "Logging in to GitLab registry..."
         docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+        docker pull "$DOCKER_IMAGE_APP:latest"
 
-        echo "Pulling image $APP_DOCKER_IMAGE:latest..."
-        docker pull "$APP_DOCKER_IMAGE:latest"
+        docker stop "$CONTAINER_NAME_APP" 2>/dev/null || true
+        docker rm "$CONTAINER_NAME_APP" 2>/dev/null || true
 
-        echo "Stopping and removing old container..."
-        docker stop "$APP_CONTAINER_NAME" 2>/dev/null || true
-        docker rm   "$APP_CONTAINER_NAME" 2>/dev/null || true
-
-        echo "Starting new container..."
         docker run -d \
-          --name "$APP_CONTAINER_NAME" \
+          --name "$CONTAINER_NAME_APP" \
           --restart unless-stopped \
           --network traefik \
           -l "traefik.enable=true" \
-          -l "traefik.http.routers.$APP_CONTAINER_NAME.rule=Host(\`$APP_DOMAIN\`)" \
-          -l "traefik.http.routers.$APP_CONTAINER_NAME.entrypoints=websecure" \
-          -l "traefik.http.routers.$APP_CONTAINER_NAME.tls=true" \
-          -l "traefik.http.routers.$APP_CONTAINER_NAME.tls.certresolver=letsencrypt" \
-          -l "traefik.http.services.$APP_CONTAINER_NAME.loadbalancer.server.port=80" \
-          "$APP_DOCKER_IMAGE:latest"
+          -l "traefik.http.routers.$CONTAINER_NAME_APP.rule=Host(\`$APP_DOMAIN\`)" \
+          -l "traefik.http.routers.$CONTAINER_NAME_APP.entrypoints=websecure" \
+          -l "traefik.http.routers.$CONTAINER_NAME_APP.tls=true" \
+          -l "traefik.http.routers.$CONTAINER_NAME_APP.tls.certresolver=letsencrypt" \
+          -l "traefik.http.services.$CONTAINER_NAME_APP.loadbalancer.server.port=80" \
+          "$DOCKER_IMAGE_APP:latest"
 
-        echo "Cleaning up unused images..."
         docker image prune -f
-
-        echo "App deploy complete."
+        echo "Flutter Web App deployed successfully."
       EOF
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
