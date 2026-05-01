@@ -13,9 +13,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.research-backend.rule=Host(`${BACKEND_DOMAIN}`)"
-      - "traefik.http.routers.research-backend.entrypoints=websecure"
+      - "traefik.http.routers.research-backend.entrypoints=https"
       - "traefik.http.routers.research-backend.tls=true"
-      - "traefik.http.routers.research-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.research-backend.tls.certresolver=cloudflare"
       - "traefik.http.services.research-backend.loadbalancer.server.port=5005"
     networks:
       - proxy
