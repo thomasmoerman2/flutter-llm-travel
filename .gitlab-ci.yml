@@ -13,6 +13,7 @@ build-app:
   script:
     - cd packages/app
     - flutter pub get
+    - flutter create . --platforms web
     - |
       printf 'API_BASE_URL=%s\nMAPBOX_ACCESS_TOKEN=%s\nGOOGLE_PLACES_API_KEY=%s\n' \
         "$API_BASE_URL" "$MAPBOX_ACCESS_TOKEN" "$GOOGLE_PLACES_API_KEY" > .env
@@ -66,16 +67,12 @@ deploy-backend:
   image: alpine:latest
   needs: [build-backend]
   before_script:
-    - apk add --no-cache openssh-client rsync
-    - eval $(ssh-agent -s)
-    - chmod 400 "$SSH_PRIVATE_KEY" && ssh-add "$SSH_PRIVATE_KEY"
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+    - apk add --no-cache openssh-client rsync sshpass
   script:
-    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH_BACKEND"
-    - rsync -avz --delete -e "ssh" packages/backend/publish/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_BACKEND/"
-    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "echo 'BACKEND_DOMAIN=${BACKEND_DOMAIN}' > $DEPLOY_PATH_BACKEND/.env"
-    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH_BACKEND && docker compose up -d --force-recreate"
+    - sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_PATH_BACKEND"
+    - sshpass -p "$DEPLOY_PASSWORD" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" packages/backend/publish/ $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_BACKEND/
+    - sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "echo 'BACKEND_DOMAIN=${BACKEND_DOMAIN}' > $DEPLOY_PATH_BACKEND/.env"
+    - sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_PATH_BACKEND && docker compose up -d --force-recreate"
     - echo "✅ Backend deployed!"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
