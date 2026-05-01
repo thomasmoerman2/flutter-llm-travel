@@ -48,13 +48,13 @@ deploy-app:
   before_script:
     - apk add --no-cache openssh-client rsync
     - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - chmod 400 "$SSH_PRIVATE_KEY" && ssh-add "$SSH_PRIVATE_KEY"
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
   script:
     - ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH_APP"
-    - printf 'APP_DOMAIN=%s\n' "$APP_DOMAIN" > packages/app/build/web/.env
     - rsync -avz --delete -e "ssh" packages/app/build/web/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_APP/"
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "echo 'APP_DOMAIN=${APP_DOMAIN}' > $DEPLOY_PATH_APP/.env"
     - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH_APP && docker compose up -d --force-recreate"
     - echo "✅ Flutter web deployed!"
   rules:
@@ -68,13 +68,13 @@ deploy-backend:
   before_script:
     - apk add --no-cache openssh-client rsync
     - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - chmod 400 "$SSH_PRIVATE_KEY" && ssh-add "$SSH_PRIVATE_KEY"
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
   script:
     - ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH_BACKEND"
-    - printf 'BACKEND_DOMAIN=%s\n' "$BACKEND_DOMAIN" > packages/backend/publish/.env
     - rsync -avz --delete -e "ssh" packages/backend/publish/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_BACKEND/"
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "echo 'BACKEND_DOMAIN=${BACKEND_DOMAIN}' > $DEPLOY_PATH_BACKEND/.env"
     - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH_BACKEND && docker compose up -d --force-recreate"
     - echo "✅ Backend deployed!"
   rules:
