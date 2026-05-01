@@ -80,6 +80,11 @@ deploy-app:
     - |
       ssh "$DEPLOY_USER@$DEPLOY_HOST" << EOF
         set -e
+        whoami
+        id
+        ls -ld /opt /opt/sites 2>/dev/null || true
+        test -w /opt/sites && printf "writable\n" || printf "not writable\n"
+
         echo "$CI_REGISTRY_PASSWORD" | docker login \
           --username "$CI_REGISTRY_USER" \
           --password-stdin \
@@ -123,6 +128,11 @@ deploy-backend:
     - |
       ssh "$DEPLOY_USER@$DEPLOY_HOST" << EOF
         set -e
+        whoami
+        id
+        ls -ld /opt /opt/sites 2>/dev/null || true
+        test -w /opt/sites && printf "writable\n" || printf "not writable\n"
+
         echo "$CI_REGISTRY_PASSWORD" | docker login \
           --username "$CI_REGISTRY_USER" \
           --password-stdin \
