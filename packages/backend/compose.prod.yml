@@ -1,0 +1,25 @@
+services:
+  app:
+    image: mcr.microsoft.com/dotnet/aspnet:9.0
+    user: "app"
+    working_dir: /app
+    command: dotnet backend.dll
+    volumes:
+      - .:/app:ro
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=5005
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.research-backend.rule=Host(`${BACKEND_DOMAIN}`)"
+      - "traefik.http.routers.research-backend.entrypoints=websecure"
+      - "traefik.http.routers.research-backend.tls=true"
+      - "traefik.http.routers.research-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.research-backend.loadbalancer.server.port=5005"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

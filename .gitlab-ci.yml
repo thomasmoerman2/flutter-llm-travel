@@ -3,65 +3,40 @@ stages:
   - deploy
 
 variables:
-  DOCKER_TLS_CERTDIR: ""
-  DOCKER_DRIVER: overlay2
-
-  DOCKER_IMAGE_APP: $CI_REGISTRY_IMAGE/app
-  CONTAINER_NAME_APP: research-app
-
-  DOCKER_IMAGE_BACKEND: $CI_REGISTRY_IMAGE/backend
-  CONTAINER_NAME_BACKEND: research-backend
+  DEPLOY_PATH_APP: "/opt/sites/research-app"
+  DEPLOY_PATH_BACKEND: "/opt/sites/research-backend"
 
 # ── BUILD FLUTTER WEB ─────────────────────────────────────────────────────
 build-app:
   stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
-  before_script:
-    - |
-      echo "$CI_REGISTRY_PASSWORD" | docker login \
-        --username "$CI_REGISTRY_USER" \
-        --password-stdin \
-        "$CI_REGISTRY"
+  image: ghcr.io/cirruslabs/flutter:stable
   script:
+    - cd packages/app
+    - flutter pub get
     - |
-      docker build \
-        --cache-from "$DOCKER_IMAGE_APP:latest" \
-        --build-arg API_BASE_URL="$API_BASE_URL" \
-        --build-arg MAPBOX_ACCESS_TOKEN="$MAPBOX_ACCESS_TOKEN" \
-        --build-arg GOOGLE_PLACES_API_KEY="$GOOGLE_PLACES_API_KEY" \
-        -t "$DOCKER_IMAGE_APP:$CI_COMMIT_SHORT_SHA" \
-        -t "$DOCKER_IMAGE_APP:latest" \
-        -f packages/app/Dockerfile \
-        packages/app
-    - docker push "$DOCKER_IMAGE_APP:$CI_COMMIT_SHORT_SHA"
-    - docker push "$DOCKER_IMAGE_APP:latest"
+      printf 'API_BASE_URL=%s\nMAPBOX_ACCESS_TOKEN=%s\nGOOGLE_PLACES_API_KEY=%s\n' \
+        "$API_BASE_URL" "$MAPBOX_ACCESS_TOKEN" "$GOOGLE_PLACES_API_KEY" > .env
+    - flutter build web --release
+    - cp compose.prod.yml build/web/compose.yml
+  artifacts:
+    paths:
+      - packages/app/build/web/
+    expire_in: 1 hour
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
 # ── BUILD BACKEND ─────────────────────────────────────────────────────────
 build-backend:
   stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
-  before_script:
-    - |
-      echo "$CI_REGISTRY_PASSWORD" | docker login \
-        --username "$CI_REGISTRY_USER" \
-        --password-stdin \
-        "$CI_REGISTRY"
+  image: mcr.microsoft.com/dotnet/sdk:9.0
   script:
-    - |
-      docker build \
-        --cache-from "$DOCKER_IMAGE_BACKEND:latest" \
-        -t "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA" \
-        -t "$DOCKER_IMAGE_BACKEND:latest" \
-        -f packages/backend/Dockerfile \
-        packages/backend
-    - docker push "$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA"
-    - docker push "$DOCKER_IMAGE_BACKEND:latest"
+    - cd packages/backend
+    - dotnet publish -c Release -o publish /p:UseAppHost=false
+    - cp compose.prod.yml publish/compose.yml
+  artifacts:
+    paths:
+      - packages/backend/publish/
+    expire_in: 1 hour
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
@@ -71,45 +46,17 @@ deploy-app:
   image: alpine:latest
   needs: [build-app]
   before_script:
-    - apk add --no-cache openssh-client
+    - apk add --no-cache openssh-client rsync
     - eval $(ssh-agent -s)
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
   script:
-    - |
-      ssh "$DEPLOY_USER@$DEPLOY_HOST" << EOF
-        set -e
-        whoami
-        id
-        ls -ld /opt /opt/sites 2>/dev/null || true
-        test -w /opt/sites && printf "writable\n" || printf "not writable\n"
-
-        echo "$CI_REGISTRY_PASSWORD" | docker login \
-          --username "$CI_REGISTRY_USER" \
-          --password-stdin \
-          "$CI_REGISTRY"
-
-        docker pull "$DOCKER_IMAGE_APP:latest"
-
-        docker stop "$CONTAINER_NAME_APP" 2>/dev/null || true
-        docker rm "$CONTAINER_NAME_APP" 2>/dev/null || true
-
-        docker run -d \
-          --name "$CONTAINER_NAME_APP" \
-          --restart unless-stopped \
-          --network traefik \
-          -l "traefik.enable=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME_APP.rule=Host(\`$APP_DOMAIN\`)" \
-          -l "traefik.http.routers.$CONTAINER_NAME_APP.entrypoints=websecure" \
-          -l "traefik.http.routers.$CONTAINER_NAME_APP.tls=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME_APP.tls.certresolver=letsencrypt" \
-          -l "traefik.http.services.$CONTAINER_NAME_APP.loadbalancer.server.port=80" \
-          "$DOCKER_IMAGE_APP:latest"
-
-        docker image prune -f
-        echo "✅ Flutter Web App deployed!"
-      EOF
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH_APP"
+    - printf 'APP_DOMAIN=%s\n' "$APP_DOMAIN" > packages/app/build/web/.env
+    - rsync -avz --delete -e "ssh" packages/app/build/web/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_APP/"
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH_APP && docker compose up -d --force-recreate"
+    - echo "✅ Flutter web deployed!"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
@@ -119,44 +66,16 @@ deploy-backend:
   image: alpine:latest
   needs: [build-backend]
   before_script:
-    - apk add --no-cache openssh-client
+    - apk add --no-cache openssh-client rsync
     - eval $(ssh-agent -s)
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
   script:
-    - |
-      ssh "$DEPLOY_USER@$DEPLOY_HOST" << EOF
-        set -e
-        whoami
-        id
-        ls -ld /opt /opt/sites 2>/dev/null || true
-        test -w /opt/sites && printf "writable\n" || printf "not writable\n"
-
-        echo "$CI_REGISTRY_PASSWORD" | docker login \
-          --username "$CI_REGISTRY_USER" \
-          --password-stdin \
-          "$CI_REGISTRY"
-
-        docker pull "$DOCKER_IMAGE_BACKEND:latest"
-
-        docker stop "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
-        docker rm "$CONTAINER_NAME_BACKEND" 2>/dev/null || true
-
-        docker run -d \
-          --name "$CONTAINER_NAME_BACKEND" \
-          --restart unless-stopped \
-          --network traefik \
-          -l "traefik.enable=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.rule=Host(\`$BACKEND_DOMAIN\`)" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.entrypoints=websecure" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls=true" \
-          -l "traefik.http.routers.$CONTAINER_NAME_BACKEND.tls.certresolver=letsencrypt" \
-          -l "traefik.http.services.$CONTAINER_NAME_BACKEND.loadbalancer.server.port=5005" \
-          "$DOCKER_IMAGE_BACKEND:latest"
-
-        docker image prune -f
-        echo "✅ Backend deployed!"
-      EOF
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $DEPLOY_PATH_BACKEND"
+    - printf 'BACKEND_DOMAIN=%s\n' "$BACKEND_DOMAIN" > packages/backend/publish/.env
+    - rsync -avz --delete -e "ssh" packages/backend/publish/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_BACKEND/"
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH_BACKEND && docker compose up -d --force-recreate"
+    - echo "✅ Backend deployed!"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
