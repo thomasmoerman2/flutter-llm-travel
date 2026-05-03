@@ -5,22 +5,15 @@ services:
     working_dir: /app
     command: dotnet backend.dll
     volumes:
-      - .:/app:ro
+      - .:/app:ro                 # published .NET files (read-only)
+      - app-keys:/app/keys        # writable volume for ASP.NET Data Protection keys
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=5005
       - OpenAIAPIKey=${OPENAI_API_KEY}
       - GeminiAPIKey=${GEMINI_API_KEY}
       - CORS=${CORS_ORIGINS}
-      - FirebaseCredentials__type=service_account
-      - FirebaseCredentials__project_id=${FIREBASE_PROJECT_ID}
-      - FirebaseCredentials__private_key_id=${FIREBASE_PRIVATE_KEY_ID}
-      - FirebaseCredentials__private_key=${FIREBASE_PRIVATE_KEY}
-      - FirebaseCredentials__client_email=${FIREBASE_CLIENT_EMAIL}
-      - FirebaseCredentials__client_id=${FIREBASE_CLIENT_ID}
-      - FirebaseCredentials__token_uri=https://oauth2.googleapis.com/token
-      - FirebaseCredentials__auth_uri=https://accounts.google.com/o/oauth2/auth
-      - FirebaseCredentials__universe_domain=googleapis.com
+      - FIREBASE_CREDENTIALS_FILE=/app/firebase-credentials.json
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -42,3 +35,6 @@ services:
 networks:
   proxy:
     external: true
+
+volumes:
+  app-keys:

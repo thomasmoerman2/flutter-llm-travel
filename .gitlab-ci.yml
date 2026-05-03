@@ -71,11 +71,13 @@ deploy-backend:
   script:
     - sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_PATH_BACKEND"
     - sshpass -p "$DEPLOY_PASSWORD" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" packages/backend/publish/ $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_BACKEND/
+    # Copy Firebase credentials JSON file (File-type CI variable) to the server
+    - sshpass -p "$DEPLOY_PASSWORD" scp -o StrictHostKeyChecking=no "$FirebaseCredentials" $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH_BACKEND/firebase-credentials.json
+    # Write .env — no Firebase keys here, credentials come from the JSON file above
     - |
-      sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "printf 'BACKEND_DOMAIN=%s\nOPENAI_API_KEY=%s\nGEMINI_API_KEY=%s\nCORS_ORIGINS=%s\nFIREBASE_PROJECT_ID=%s\nFIREBASE_PRIVATE_KEY_ID=%s\nFIREBASE_PRIVATE_KEY=%s\nFIREBASE_CLIENT_EMAIL=%s\nFIREBASE_CLIENT_ID=%s\n' \
-        '$BACKEND_DOMAIN' '$OPENAI_API_KEY' '$GEMINI_API_KEY' '$CORS_ORIGINS' \
-        '$FIREBASE_PROJECT_ID' '$FIREBASE_PRIVATE_KEY_ID' '$FIREBASE_PRIVATE_KEY' \
-        '$FIREBASE_CLIENT_EMAIL' '$FIREBASE_CLIENT_ID' > $DEPLOY_PATH_BACKEND/.env"
+      sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST \
+        "printf 'BACKEND_DOMAIN=%s\nOPENAI_API_KEY=%s\nGEMINI_API_KEY=%s\nCORS_ORIGINS=%s\n' \
+        '$BACKEND_DOMAIN' '$OPENAI_API_KEY' '$GEMINI_API_KEY' '$CORS_ORIGINS' > $DEPLOY_PATH_BACKEND/.env"
     - sshpass -p "$DEPLOY_PASSWORD" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_PATH_BACKEND && docker compose up -d --force-recreate"
     - echo "✅ Backend deployed!"
   rules:

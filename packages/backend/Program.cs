@@ -15,32 +15,46 @@ builder.Logging.AddSerilog(Log.Logger);
 builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo("/app/keys"));
 builder.Configuration.AddJsonFile("/app/keys/appsettings.Production.json", optional: true, reloadOnChange: true);
 
-string? firebaseJson = builder.Configuration["FirebaseCredentials"];
-var firebaseConfig = builder.Configuration.GetSection("FirebaseCredentials");
-if (!string.IsNullOrWhiteSpace(firebaseJson) ||
-    (firebaseConfig.Exists() && firebaseConfig.GetChildren().Any())) // FirebaseConfig
+// Firebase credentials: support both a JSON file path and a raw JSON string.
+// In production, FIREBASE_CREDENTIALS_FILE points to the mounted service account JSON.
+// In development, FirebaseCredentials in appsettings.json holds the credentials object.
+string? firebaseJson = null;
+
+string? credFilePath = builder.Configuration["FIREBASE_CREDENTIALS_FILE"];
+if (!string.IsNullOrWhiteSpace(credFilePath) && File.Exists(credFilePath))
 {
-    Log.Information("[X] FirebaseCredentials : Found");
-    try
+    firebaseJson = File.ReadAllText(credFilePath);
+    Log.Information("[X] FirebaseCredentials : Loaded from file ({Path})", credFilePath);
+}
+else
+{
+    var firebaseConfig = builder.Configuration.GetSection("FirebaseCredentials");
+    if (firebaseConfig.Exists() && firebaseConfig.GetChildren().Any())
     {
-        string json = firebaseJson ?? System.Text.Json.JsonSerializer.Serialize(
+        firebaseJson = System.Text.Json.JsonSerializer.Serialize(
             firebaseConfig.Get<Dictionary<string, object>>()
         );
-        // Initialize Firebase with credentials
+        Log.Information("[X] FirebaseCredentials : Loaded from configuration section");
+    }
+}
+
+if (!string.IsNullOrWhiteSpace(firebaseJson))
+{
+    try
+    {
         FirebaseApp.Create(new AppOptions()
         {
-            Credential = GoogleCredential.FromJson(json),
+            Credential = GoogleCredential.FromJson(firebaseJson),
         });
+        Log.Information("[X] FirebaseCredentials : App initialized");
     }
     catch (Exception ex)
     {
-        // Log the error but don't crash the application
         Log.Error(ex, "Hey buddy, FirebaseConfig_Error!");
     }
 }
 else
 {
-    // For development: Use local Firebase credentials
     Log.Information("[ ] FirebaseCredentials : null");
 }
 
