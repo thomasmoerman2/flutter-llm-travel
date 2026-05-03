@@ -9,13 +9,32 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=5005
+      - OpenAIAPIKey=${OPENAI_API_KEY}
+      - GeminiAPIKey=${GEMINI_API_KEY}
+      - CORS=${CORS_ORIGINS}
+      - FirebaseCredentials__type=service_account
+      - FirebaseCredentials__project_id=${FIREBASE_PROJECT_ID}
+      - FirebaseCredentials__private_key_id=${FIREBASE_PRIVATE_KEY_ID}
+      - FirebaseCredentials__private_key=${FIREBASE_PRIVATE_KEY}
+      - FirebaseCredentials__client_email=${FIREBASE_CLIENT_EMAIL}
+      - FirebaseCredentials__client_id=${FIREBASE_CLIENT_ID}
+      - FirebaseCredentials__token_uri=https://oauth2.googleapis.com/token
+      - FirebaseCredentials__auth_uri=https://accounts.google.com/o/oauth2/auth
+      - FirebaseCredentials__universe_domain=googleapis.com
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
+      # ── HTTPS router ────────────────────────────────────────────────────────
       - "traefik.http.routers.research-backend.rule=Host(`${BACKEND_DOMAIN}`)"
       - "traefik.http.routers.research-backend.entrypoints=https"
       - "traefik.http.routers.research-backend.tls=true"
       - "traefik.http.routers.research-backend.tls.certresolver=cloudflare"
+      # ── HTTP → HTTPS redirect ────────────────────────────────────────────────
+      - "traefik.http.routers.research-backend-http.rule=Host(`${BACKEND_DOMAIN}`)"
+      - "traefik.http.routers.research-backend-http.entrypoints=http"
+      - "traefik.http.routers.research-backend-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      # ── Service ──────────────────────────────────────────────────────────────
       - "traefik.http.services.research-backend.loadbalancer.server.port=5005"
     networks:
       - proxy
