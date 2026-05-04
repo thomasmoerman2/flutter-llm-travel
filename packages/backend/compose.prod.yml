@@ -6,7 +6,6 @@ services:
     command: dotnet backend.dll
     volumes:
       - .:/app:ro                 # published .NET files (read-only)
-      - app-keys:/app/keys        # writable volume for ASP.NET Data Protection keys
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=5005
